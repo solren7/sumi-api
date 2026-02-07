@@ -8,16 +8,15 @@ import (
 )
 
 type Config struct {
-	DBDSN       string `env:"DB_DSN" `
+	DBDSN       string `env:"DB_DSN"`
 	RedisConfig RedisConfig
 	ServerPort  string `env:"SERVER_PORT"`
+	JWTSecret   string `env:"JWT_SECRET" envDefault:"secret"`
 }
 
 type RedisConfig struct {
 	// 基础连接信息
-	Addr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
-	Password string `env:"REDIS_PASSWORD" envDefault:""`
-	DB       int    `env:"REDIS_DB" envDefault:"0"`
+	RedisURL     string `env:"REDIS_URL" envDefault:"localhost:6379"`
 
 	// 超时设置 (配置库会自动解析 "10s", "500ms" 等字符串为 time.Duration)
 	DialTimeout  time.Duration `env:"REDIS_DIAL_TIMEOUT" envDefault:"5s"`

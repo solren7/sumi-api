@@ -14,11 +14,15 @@ func Info(msg string)  { logger.Info().Msg(msg) }
 func Debug(msg string) { logger.Debug().Msg(msg) }
 func Warn(msg string)  { logger.Warn().Msg(msg) }
 func Error(msg string) { logger.Error().Msg(msg) }
+func Fatal(msg string) { logger.Fatal().Msg(msg) }
+func Panic(msg string) { logger.Panic().Msg(msg) }
 
 func Infof(format string, args ...any)  { logger.Info().Msgf(format, args...) }
 func Debugf(format string, args ...any) { logger.Debug().Msgf(format, args...) }
 func Warnf(format string, args ...any)  { logger.Warn().Msgf(format, args...) }
 func Errorf(format string, args ...any) { logger.Error().Msgf(format, args...) }
+func Fatalf(format string, args ...any) { logger.Fatal().Msgf(format, args...) }
+func Panicf(format string, args ...any) { logger.Panic().Msgf(format, args...) }
 
 // ============================================================
 // Package-level builder starters (return pooled *LogEntry)

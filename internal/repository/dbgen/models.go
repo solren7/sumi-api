@@ -8,47 +8,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Account struct {
-	ID        int32              `json:"id"`
-	UserID    int64              `json:"user_id"`
-	Name      string             `json:"name"`
-	Type      string             `json:"type"`
-	Currency  string             `json:"currency"`
-	Icon      []byte             `json:"icon"`
-	Color     pgtype.Text        `json:"color"`
-	Status    string             `json:"status"`
-	IsDefault bool               `json:"is_default"`
-	SortOrder int32              `json:"sort_order"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-}
-
-type Transaction struct {
-	ID              int32              `json:"id"`
-	UserID          int64              `json:"user_id"`
-	Type            string             `json:"type"`
-	Amount          pgtype.Numeric     `json:"amount"`
-	Currency        string             `json:"currency"`
-	Description     pgtype.Text        `json:"description"`
-	Notes           pgtype.Text        `json:"notes"`
-	TransactionDate pgtype.Date        `json:"transaction_date"`
-	TransactionID   pgtype.UUID        `json:"transaction_id"`
-	CategoryID      pgtype.Int8        `json:"category_id"`
-	AccountID       pgtype.Int8        `json:"account_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+type Bill struct {
+	ID          int64              `json:"id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	Description string             `json:"description"`
+	BillType    int16              `json:"bill_type"`
+	Category    int32              `json:"category"`
+	RecordDate  pgtype.Timestamptz `json:"record_date"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {
-	ID              int64              `json:"id"`
-	Email           string             `json:"email"`
-	PasswordHash    string             `json:"password_hash"`
-	Nickname        string             `json:"nickname"`
-	AvatarUrl       pgtype.Text        `json:"avatar_url"`
-	DefaultCurrency string             `json:"default_currency"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+	ID        pgtype.UUID        `json:"id"`
+	Username  string             `json:"username"`
+	Email     string             `json:"email"`
+	Password  string             `json:"password"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }

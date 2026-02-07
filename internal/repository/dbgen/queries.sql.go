@@ -11,299 +11,291 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createAccount = `-- name: CreateAccount :one
-INSERT INTO accounts (
-  user_id, name, type, currency, icon, color, status, is_default, sort_order
+const createBill = `-- name: CreateBill :one
+INSERT INTO bills (
+    user_id, amount, description, bill_type, category, record_date
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9
-)
-RETURNING id, user_id, name, type, currency, icon, color, status, is_default, sort_order, created_at, updated_at, deleted_at
+    $1, $2, $3, $4, $5, $6
+) RETURNING id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at
 `
 
-type CreateAccountParams struct {
-	UserID    int64       `json:"user_id"`
-	Name      string      `json:"name"`
-	Type      string      `json:"type"`
-	Currency  string      `json:"currency"`
-	Icon      []byte      `json:"icon"`
-	Color     pgtype.Text `json:"color"`
-	Status    string      `json:"status"`
-	IsDefault bool        `json:"is_default"`
-	SortOrder int32       `json:"sort_order"`
+type CreateBillParams struct {
+	UserID      pgtype.UUID        `json:"user_id"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	Description string             `json:"description"`
+	BillType    int16              `json:"bill_type"`
+	Category    int32              `json:"category"`
+	RecordDate  pgtype.Timestamptz `json:"record_date"`
 }
 
-func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error) {
-	row := q.db.QueryRow(ctx, createAccount,
+func (q *Queries) CreateBill(ctx context.Context, arg CreateBillParams) (Bill, error) {
+	row := q.db.QueryRow(ctx, createBill,
 		arg.UserID,
-		arg.Name,
-		arg.Type,
-		arg.Currency,
-		arg.Icon,
-		arg.Color,
-		arg.Status,
-		arg.IsDefault,
-		arg.SortOrder,
-	)
-	var i Account
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.Type,
-		&i.Currency,
-		&i.Icon,
-		&i.Color,
-		&i.Status,
-		&i.IsDefault,
-		&i.SortOrder,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
-const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (
-  user_id, type, amount, currency, description, notes, 
-  transaction_date, transaction_id, category_id, account_id
-) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-)
-RETURNING id, user_id, type, amount, currency, description, notes, transaction_date, transaction_id, category_id, account_id, created_at, updated_at, deleted_at
-`
-
-type CreateTransactionParams struct {
-	UserID          int64          `json:"user_id"`
-	Type            string         `json:"type"`
-	Amount          pgtype.Numeric `json:"amount"`
-	Currency        string         `json:"currency"`
-	Description     pgtype.Text    `json:"description"`
-	Notes           pgtype.Text    `json:"notes"`
-	TransactionDate pgtype.Date    `json:"transaction_date"`
-	TransactionID   pgtype.UUID    `json:"transaction_id"`
-	CategoryID      pgtype.Int8    `json:"category_id"`
-	AccountID       pgtype.Int8    `json:"account_id"`
-}
-
-func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
-	row := q.db.QueryRow(ctx, createTransaction,
-		arg.UserID,
-		arg.Type,
 		arg.Amount,
-		arg.Currency,
 		arg.Description,
-		arg.Notes,
-		arg.TransactionDate,
-		arg.TransactionID,
-		arg.CategoryID,
-		arg.AccountID,
+		arg.BillType,
+		arg.Category,
+		arg.RecordDate,
 	)
-	var i Transaction
+	var i Bill
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.Type,
 		&i.Amount,
-		&i.Currency,
 		&i.Description,
-		&i.Notes,
-		&i.TransactionDate,
-		&i.TransactionID,
-		&i.CategoryID,
-		&i.AccountID,
+		&i.BillType,
+		&i.Category,
+		&i.RecordDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.DeletedAt,
 	)
 	return i, err
 }
 
-const getAccount = `-- name: GetAccount :one
-SELECT id, user_id, name, type, currency, icon, color, status, is_default, sort_order, created_at, updated_at, deleted_at FROM accounts
-WHERE id = $1 LIMIT 1
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (
+    username, email, password
+) VALUES (
+    $1, $2, $3
+) RETURNING id, username, email, password, created_at, updated_at
 `
 
-func (q *Queries) GetAccount(ctx context.Context, id int32) (Account, error) {
-	row := q.db.QueryRow(ctx, getAccount, id)
-	var i Account
+type CreateUserParams struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.Password)
+	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.Type,
-		&i.Currency,
-		&i.Icon,
-		&i.Color,
-		&i.Status,
-		&i.IsDefault,
-		&i.SortOrder,
+		&i.Username,
+		&i.Email,
+		&i.Password,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.DeletedAt,
 	)
 	return i, err
 }
 
-const getRecentTransactions = `-- name: GetRecentTransactions :many
-SELECT id, user_id, type, amount, currency, description, notes, transaction_date, transaction_id, category_id, account_id, created_at, updated_at, deleted_at FROM transactions
-WHERE user_id = $1 
-  AND deleted_at IS NULL
-ORDER BY transaction_date DESC, created_at DESC
-LIMIT $2 OFFSET $3
-`
-
-type GetRecentTransactionsParams struct {
-	UserID int64 `json:"user_id"`
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-// 获取某个用户最近的交易记录，支持分页
-func (q *Queries) GetRecentTransactions(ctx context.Context, arg GetRecentTransactionsParams) ([]Transaction, error) {
-	rows, err := q.db.Query(ctx, getRecentTransactions, arg.UserID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Transaction
-	for rows.Next() {
-		var i Transaction
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Type,
-			&i.Amount,
-			&i.Currency,
-			&i.Description,
-			&i.Notes,
-			&i.TransactionDate,
-			&i.TransactionID,
-			&i.CategoryID,
-			&i.AccountID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAccountsByUserId = `-- name: ListAccountsByUserId :many
-SELECT id, user_id, name, type, currency, icon, color, status, is_default, sort_order, created_at, updated_at, deleted_at FROM accounts
-WHERE user_id = $1 
-  AND deleted_at IS NULL
-ORDER BY sort_order ASC, created_at DESC
-`
-
-func (q *Queries) ListAccountsByUserId(ctx context.Context, userID int64) ([]Account, error) {
-	rows, err := q.db.Query(ctx, listAccountsByUserId, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Account
-	for rows.Next() {
-		var i Account
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.Type,
-			&i.Currency,
-			&i.Icon,
-			&i.Color,
-			&i.Status,
-			&i.IsDefault,
-			&i.SortOrder,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const softDeleteTransaction = `-- name: SoftDeleteTransaction :exec
-UPDATE transactions
-SET deleted_at = NOW()
+const deleteBill = `-- name: DeleteBill :exec
+DELETE FROM bills
 WHERE id = $1 AND user_id = $2
 `
 
-type SoftDeleteTransactionParams struct {
-	ID     int32 `json:"id"`
-	UserID int64 `json:"user_id"`
+type DeleteBillParams struct {
+	ID     int64       `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
 }
 
-func (q *Queries) SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTransactionParams) error {
-	_, err := q.db.Exec(ctx, softDeleteTransaction, arg.ID, arg.UserID)
+func (q *Queries) DeleteBill(ctx context.Context, arg DeleteBillParams) error {
+	_, err := q.db.Exec(ctx, deleteBill, arg.ID, arg.UserID)
 	return err
 }
 
-const updateAccount = `-- name: UpdateAccount :one
-UPDATE accounts
-SET 
-  name = $2,
-  type = $3,
-  icon = $4,
-  color = $5,
-  status = $6,
-  is_default = $7,
-  sort_order = $8,
-  updated_at = NOW()
-WHERE id = $1
-RETURNING id, user_id, name, type, currency, icon, color, status, is_default, sort_order, created_at, updated_at, deleted_at
+const getDailyStats = `-- name: GetDailyStats :many
+SELECT 
+    record_date::DATE as date, -- 强转为日期，去掉时分秒
+    COALESCE(SUM(CASE WHEN bill_type = 2 THEN amount ELSE 0 END), 0)::DECIMAL as daily_income,
+    COALESCE(SUM(CASE WHEN bill_type = 1 THEN amount ELSE 0 END), 0)::DECIMAL as daily_expense
+FROM bills
+WHERE user_id = $1 
+  AND record_date >= $2::TIMESTAMPTZ 
+  AND record_date <= $3::TIMESTAMPTZ
+GROUP BY record_date::DATE
+ORDER BY date DESC
 `
 
-type UpdateAccountParams struct {
-	ID        int32       `json:"id"`
-	Name      string      `json:"name"`
-	Type      string      `json:"type"`
-	Icon      []byte      `json:"icon"`
-	Color     pgtype.Text `json:"color"`
-	Status    string      `json:"status"`
-	IsDefault bool        `json:"is_default"`
-	SortOrder int32       `json:"sort_order"`
+type GetDailyStatsParams struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	StartTime pgtype.Timestamptz `json:"start_time"`
+	EndTime   pgtype.Timestamptz `json:"end_time"`
 }
 
-func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error) {
-	row := q.db.QueryRow(ctx, updateAccount,
-		arg.ID,
-		arg.Name,
-		arg.Type,
-		arg.Icon,
-		arg.Color,
-		arg.Status,
-		arg.IsDefault,
-		arg.SortOrder,
+type GetDailyStatsRow struct {
+	Date         pgtype.Date    `json:"date"`
+	DailyIncome  pgtype.Numeric `json:"daily_income"`
+	DailyExpense pgtype.Numeric `json:"daily_expense"`
+}
+
+// 首页列表：核心变化在这里
+// 我们需要把 record_date 强转为 DATE 类型来分组
+func (q *Queries) GetDailyStats(ctx context.Context, arg GetDailyStatsParams) ([]GetDailyStatsRow, error) {
+	rows, err := q.db.Query(ctx, getDailyStats, arg.UserID, arg.StartTime, arg.EndTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDailyStatsRow
+	for rows.Next() {
+		var i GetDailyStatsRow
+		if err := rows.Scan(&i.Date, &i.DailyIncome, &i.DailyExpense); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMonthlyStats = `-- name: GetMonthlyStats :one
+SELECT 
+    COALESCE(SUM(CASE WHEN bill_type = 2 THEN amount ELSE 0 END), 0)::DECIMAL as total_income,
+    COALESCE(SUM(CASE WHEN bill_type = 1 THEN amount ELSE 0 END), 0)::DECIMAL as total_expense
+FROM bills
+WHERE user_id = $1 
+  AND record_date >= $2::TIMESTAMPTZ 
+  AND record_date <= $3::TIMESTAMPTZ
+`
+
+type GetMonthlyStatsParams struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	StartTime pgtype.Timestamptz `json:"start_time"`
+	EndTime   pgtype.Timestamptz `json:"end_time"`
+}
+
+type GetMonthlyStatsRow struct {
+	TotalIncome  pgtype.Numeric `json:"total_income"`
+	TotalExpense pgtype.Numeric `json:"total_expense"`
+}
+
+// 首页顶部统计：依然是按时间范围查，逻辑不变
+func (q *Queries) GetMonthlyStats(ctx context.Context, arg GetMonthlyStatsParams) (GetMonthlyStatsRow, error) {
+	row := q.db.QueryRow(ctx, getMonthlyStats, arg.UserID, arg.StartTime, arg.EndTime)
+	var i GetMonthlyStatsRow
+	err := row.Scan(&i.TotalIncome, &i.TotalExpense)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, username, email, password, created_at, updated_at FROM users
+WHERE email = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
-	var i Account
+	return i, err
+}
+
+const getUserById = `-- name: GetUserById :one
+SELECT id, username, email, password, created_at, updated_at FROM users
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserById(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserById, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listBills = `-- name: ListBills :many
+SELECT id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at FROM bills
+WHERE user_id = $1
+ORDER BY record_date DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListBillsParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Limit  int32       `json:"limit"`
+	Offset int32       `json:"offset"`
+}
+
+func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, error) {
+	rows, err := q.db.Query(ctx, listBills, arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Bill
+	for rows.Next() {
+		var i Bill
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Amount,
+			&i.Description,
+			&i.BillType,
+			&i.Category,
+			&i.RecordDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateBill = `-- name: UpdateBill :one
+UPDATE bills
+SET 
+    amount = $2,
+    description = $3,
+    bill_type = $4,
+    category = $5,
+    record_date = $6
+WHERE id = $1 AND user_id = $7
+RETURNING id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at
+`
+
+type UpdateBillParams struct {
+	ID          int64              `json:"id"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	Description string             `json:"description"`
+	BillType    int16              `json:"bill_type"`
+	Category    int32              `json:"category"`
+	RecordDate  pgtype.Timestamptz `json:"record_date"`
+	UserID      pgtype.UUID        `json:"user_id"`
+}
+
+// sqlc 会自动处理 updated_at (通过数据库触发器)，不需要手动传
+func (q *Queries) UpdateBill(ctx context.Context, arg UpdateBillParams) (Bill, error) {
+	row := q.db.QueryRow(ctx, updateBill,
+		arg.ID,
+		arg.Amount,
+		arg.Description,
+		arg.BillType,
+		arg.Category,
+		arg.RecordDate,
+		arg.UserID,
+	)
+	var i Bill
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.Name,
-		&i.Type,
-		&i.Currency,
-		&i.Icon,
-		&i.Color,
-		&i.Status,
-		&i.IsDefault,
-		&i.SortOrder,
+		&i.Amount,
+		&i.Description,
+		&i.BillType,
+		&i.Category,
+		&i.RecordDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.DeletedAt,
 	)
 	return i, err
 }

@@ -9,16 +9,30 @@ import (
 
 	"fiber/config"
 	"fiber/internal/database"
+	"fiber/internal/handlers"
+	"fiber/internal/repository/dbgen"
+	"fiber/internal/services"
+	"fiber/middleware"
 	"fiber/pkg/logx"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/recover"
 )
 
 func StartAPIServer(cfg *config.Config) {
 	app := fiber.New(fiber.Config{
-		AppName:     "MyFiberApp",
-		ReadTimeout: 10 * time.Second,
+		AppName:      "MyFiberApp",
+		ReadTimeout:  10 * time.Second,
+		ErrorHandler: middleware.ErrorHandler,
 	})
+	app.Use(recover.New(recover.Config{
+		// 是否开启堆栈跟踪 (默认 false)
+		// 开启后，控制台会打印详细的错误堆栈，方便调试
+		EnableStackTrace: true,
+		StackTraceHandler: func(c fiber.Ctx, e any) {
+			logx.Panicf("Panic: %v", e)
+		},
+	}))
 
 	// 1. 初始化数据库 (增加错误处理)
 	logx.Info("Connecting to database...")
@@ -30,14 +44,23 @@ func StartAPIServer(cfg *config.Config) {
 		logx.WithError(err).Fatal("Failed to connect to Database")
 	}
 
-	// 2. 初始化 Redis
+	// 2. Initialize Redis
 	logx.Info("Connecting to redis...")
-	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	rdb, err := database.NewRedis(redisCtx, cfg)
-	redisCancel()
+	rdb, err := database.NewRedis(context.Background(), cfg)
 	if err != nil {
-		logx.WithError(err).Fatal("Failed to connect to Redis")
+		logx.Fatal("Failed to connect to redis: " + err.Error())
 	}
+	defer rdb.Close()
+
+	// 3. Initialize Services
+	queries := dbgen.New(dbPool)
+	svc := services.NewService(queries, cfg)
+
+	// 4. Initialize Handlers
+	handler := handlers.NewHandler(svc, cfg)
+
+	// 5. Register Routes
+	RegisterRoutes(app, handler, cfg)
 
 	// 3. 准备启动 HTTP 服务
 	// 创建一个专门接收 Server 启动错误的通道

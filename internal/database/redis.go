@@ -10,21 +10,8 @@ import (
 )
 
 func NewRedis(ctx context.Context, cfg *config.Config) (redis.UniversalClient, error) {
-	// 1. 构建通用配置项
-	opts := &redis.UniversalOptions{
-		Addrs:         []string{cfg.RedisConfig.Addr},
-		DialTimeout:   cfg.RedisConfig.DialTimeout,
-		ReadTimeout:   cfg.RedisConfig.ReadTimeout,
-		WriteTimeout:  cfg.RedisConfig.WriteTimeout,
-		PoolSize:      cfg.RedisConfig.PoolSize,
-		MinIdleConns:  cfg.RedisConfig.MinIdleConns,
-		IsClusterMode: cfg.RedisConfig.IsClusterMode,
-	}
-
-	// 创建客户端
-	rdb := redis.NewUniversalClient(opts)
-
-	// 3. 立即 Ping 一下，确保连接成功 (Fail Fast)
+	opt, _ := redis.ParseURL(cfg.RedisConfig.RedisURL)
+	rdb := redis.NewClient(opt)
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}

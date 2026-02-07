@@ -1,59 +1,53 @@
--- ----------------------------
--- Table: users
--- ----------------------------
+-- 1. 定义自动更新时间的函数 (PostgreSQL 标准做法)
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- 2. 用户表
 CREATE TABLE users (
-  id         BIGINT PRIMARY KEY,
-  email      VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  nickname   VARCHAR(50) NOT NULL,
-  avatar_url VARCHAR(500),
-  default_currency CHAR(3) NOT NULL DEFAULT 'USD',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMPTZ
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username    VARCHAR(50) NOT NULL,
+    email       VARCHAR(255) NOT NULL UNIQUE,
+    password    VARCHAR(255) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ----------------------------
--- Table: accounts
--- ----------------------------
-CREATE TABLE accounts (
-  id         SERIAL PRIMARY KEY, -- 使用 SERIAL 以自动处理序列
-  user_id    BIGINT NOT NULL,
-  name       VARCHAR(50) NOT NULL,
-  type       VARCHAR(20) NOT NULL,
-  currency   CHAR(3) NOT NULL DEFAULT 'USD',
-  icon       JSONB NOT NULL DEFAULT '{}',
-  color      VARCHAR(7),
-  status     VARCHAR(20) NOT NULL DEFAULT 'active',
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMPTZ,
+-- 为 users 表绑定触发器
+CREATE TRIGGER update_users_modtime 
+BEFORE UPDATE ON users 
+FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-  CONSTRAINT accounts_status_check CHECK (status IN ('active', 'inactive', 'archived')),
-  CONSTRAINT accounts_type_check CHECK (type IN ('cash', 'bank', 'credit_card', 'alipay', 'wechat', 'investment', 'other'))
+-- 3. 账单表
+CREATE TABLE bills (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    amount      DECIMAL(12, 2) NOT NULL,
+    
+    description TEXT NOT NULL,
+    
+    -- 1: 支出, 2: 收入
+    bill_type   SMALLINT NOT NULL, 
+    
+    -- 具体分类 ID
+    category    INT NOT NULL,
+    
+    -- 记录时间：精确到时分秒 (例如：2026-02-07 14:30:00+08)
+    record_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ----------------------------
--- Table: transactions
--- ----------------------------
-CREATE TABLE transactions (
-  id               SERIAL PRIMARY KEY,
-  user_id          BIGINT NOT NULL,
-  type             VARCHAR(10) NOT NULL,
-  amount           NUMERIC(15,2) NOT NULL,
-  currency         CHAR(3) NOT NULL,
-  description      VARCHAR(200),
-  notes            TEXT,
-  transaction_date DATE NOT NULL,
-  transaction_id   UUID,
-  category_id      BIGINT,
-  account_id       BIGINT,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at       TIMESTAMPTZ,
+-- 为 bills 表绑定触发器
+CREATE TRIGGER update_bills_modtime 
+BEFORE UPDATE ON bills 
+FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-  CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'transfer')),
-  CONSTRAINT transactions_amount_check CHECK (amount > 0)
-);
+-- 索引优化：因为 record_date 变为了时间戳，查询时通常是范围查询
+CREATE INDEX idx_bills_user_record_date ON bills(user_id, record_date);
