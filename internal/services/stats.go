@@ -1,13 +1,13 @@
 package services
 
 import (
-	"context"
 	"time"
 
 	"fiber/internal/repository/dbgen"
 	"fiber/pkg/utils"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 type StatsService struct {
@@ -24,14 +24,9 @@ type HomeStatsOutput struct {
 	DailyStats   []dbgen.GetDailyStatsRow
 }
 
-func (s *StatsService) GetHomeStats(ctx context.Context, userIDStr string, dateStr string) (*HomeStatsOutput, error) {
-	userID, err := utils.StringToUUID(userIDStr)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *StatsService) GetHomeStats(ctx fiber.Ctx, dateStr string) (*HomeStatsOutput, error) {
 	var startTime, endTime time.Time
-
+	userID := ctx.Locals("user_id").(uuid.UUID)
 	if dateStr == "" {
 		now := time.Now()
 		startTime = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
@@ -48,8 +43,8 @@ func (s *StatsService) GetHomeStats(ctx context.Context, userIDStr string, dateS
 	// Fetch Monthly Stats
 	monthlyStats, err := s.q.GetMonthlyStats(ctx, dbgen.GetMonthlyStatsParams{
 		UserID:    userID,
-		StartTime: pgtype.Timestamptz{Time: startTime, Valid: true},
-		EndTime:   pgtype.Timestamptz{Time: endTime, Valid: true},
+		StartTime: startTime,
+		EndTime:   endTime,
 	})
 	if err != nil {
 		return nil, err
@@ -58,8 +53,8 @@ func (s *StatsService) GetHomeStats(ctx context.Context, userIDStr string, dateS
 	// Fetch Daily Stats
 	dailyStats, err := s.q.GetDailyStats(ctx, dbgen.GetDailyStatsParams{
 		UserID:    userID,
-		StartTime: pgtype.Timestamptz{Time: startTime, Valid: true},
-		EndTime:   pgtype.Timestamptz{Time: endTime, Valid: true},
+		StartTime: startTime,
+		EndTime:   endTime,
 	})
 	if err != nil {
 		return nil, err
@@ -70,8 +65,8 @@ func (s *StatsService) GetHomeStats(ctx context.Context, userIDStr string, dateS
 	}
 
 	return &HomeStatsOutput{
-		TotalIncome:  utils.FormatNumeric(monthlyStats.TotalIncome),
-		TotalExpense: utils.FormatNumeric(monthlyStats.TotalExpense),
+		TotalIncome:  utils.NumericToString(monthlyStats.TotalIncome),
+		TotalExpense: utils.NumericToString(monthlyStats.TotalExpense),
 		DailyStats:   dailyStats,
 	}, nil
 }

@@ -1,14 +1,13 @@
 package services
 
 import (
-	"context"
 	"time"
 
 	"fiber/internal/repository/dbgen"
-	"fiber/pkg/errorx"
-	"fiber/pkg/utils"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 type BillService struct {
@@ -20,51 +19,22 @@ func NewBillService(q *dbgen.Queries) *BillService {
 }
 
 type CreateBillInput struct {
-	UserID      string
-	Amount      string
+	Amount      decimal.Decimal
 	Description string
 	BillType    int16
 	Category    int32
-	RecordDate  string
+	RecordDate  time.Time
 }
 
-func (s *BillService) CreateBill(ctx context.Context, input CreateBillInput) (*dbgen.Bill, error) {
-	userID, err := utils.StringToUUID(input.UserID)
-	if err != nil {
-		return nil, err
-	}
-
-	amountNumeric, err := utils.StringToNumeric(input.Amount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate numeric
-	val, _ := amountNumeric.Value()
-	if val == nil {
-		return nil, errorx.ErrParamsInvalid
-	}
-
-	var recordDate time.Time
-	if input.RecordDate == "" {
-		recordDate = time.Now()
-	} else {
-		recordDate, err = time.Parse("2006-01-02 15:04:05", input.RecordDate)
-		if err != nil {
-			recordDate, err = time.Parse("2006-01-02", input.RecordDate)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
+func (s *BillService) CreateBill(ctx fiber.Ctx, input CreateBillInput) (*dbgen.Bill, error) {
+	userID := ctx.Locals("user_id").(uuid.UUID)
 	bill, err := s.q.CreateBill(ctx, dbgen.CreateBillParams{
 		UserID:      userID,
-		Amount:      amountNumeric,
+		Amount:      input.Amount,
 		Description: input.Description,
 		BillType:    input.BillType,
 		Category:    input.Category,
-		RecordDate:  pgtype.Timestamptz{Time: recordDate, Valid: true},
+		RecordDate:  input.RecordDate,
 	})
 	return &bill, err
 }
@@ -75,11 +45,8 @@ type ListBillsInput struct {
 	Offset int
 }
 
-func (s *BillService) ListBills(ctx context.Context, input ListBillsInput) ([]dbgen.Bill, error) {
-	userID, err := utils.StringToUUID(input.UserID)
-	if err != nil {
-		return nil, err
-	}
+func (s *BillService) ListBills(ctx fiber.Ctx, input ListBillsInput) ([]dbgen.Bill, error) {
+	userID := ctx.Locals("user_id").(uuid.UUID)
 
 	bills, err := s.q.ListBills(ctx, dbgen.ListBillsParams{
 		UserID: userID,
@@ -98,55 +65,30 @@ func (s *BillService) ListBills(ctx context.Context, input ListBillsInput) ([]db
 
 type UpdateBillInput struct {
 	ID          int64
-	UserID      string
-	Amount      string
+	Amount      decimal.Decimal
 	Description string
 	BillType    int16
 	Category    int32
-	RecordDate  string
+	RecordDate  time.Time
 }
 
-func (s *BillService) UpdateBill(ctx context.Context, input UpdateBillInput) (dbgen.Bill, error) {
-	userID, err := utils.StringToUUID(input.UserID)
-	if err != nil {
-		return dbgen.Bill{}, err
-	}
-
-	amountNumeric, err := utils.StringToNumeric(input.Amount)
-	if err != nil {
-		return dbgen.Bill{}, err
-	}
-
-	var recordDate time.Time
-	if input.RecordDate == "" {
-		recordDate = time.Now()
-	} else {
-		recordDate, err = time.Parse("2006-01-02 15:04:05", input.RecordDate)
-		if err != nil {
-			recordDate, err = time.Parse("2006-01-02", input.RecordDate)
-			if err != nil {
-				return dbgen.Bill{}, err
-			}
-		}
-	}
+func (s *BillService) UpdateBill(ctx fiber.Ctx, input UpdateBillInput) (dbgen.Bill, error) {
+	userID := ctx.Locals("user_id").(uuid.UUID)
 
 	bill, err := s.q.UpdateBill(ctx, dbgen.UpdateBillParams{
 		ID:          input.ID,
 		UserID:      userID,
-		Amount:      amountNumeric,
+		Amount:      input.Amount,
 		Description: input.Description,
 		BillType:    input.BillType,
 		Category:    input.Category,
-		RecordDate:  pgtype.Timestamptz{Time: recordDate, Valid: true},
+		RecordDate:  input.RecordDate,
 	})
 	return bill, err
 }
 
-func (s *BillService) DeleteBill(ctx context.Context, userIDStr string, billID int64) error {
-	userID, err := utils.StringToUUID(userIDStr)
-	if err != nil {
-		return err
-	}
+func (s *BillService) DeleteBill(ctx fiber.Ctx, billID int64) error {
+	userID := ctx.Locals("user_id").(uuid.UUID)
 
 	return s.q.DeleteBill(ctx, dbgen.DeleteBillParams{
 		ID:     billID,

@@ -68,7 +68,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*AuthO
 		return nil, err
 	}
 
-	token, err := utils.GenerateToken(utils.UUIDToString(user.ID), user.Email, s.cfg.JWTSecret)
+	token, err := utils.GenerateToken(user.ID.String(), user.Email, s.cfg.JWTSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthO
 		return nil, errors.New("invalid credentials")
 	}
 
-	token, err := utils.GenerateToken(utils.UUIDToString(user.ID), user.Email, s.cfg.JWTSecret)
+	token, err := utils.GenerateToken(user.ID.String(), user.Email, s.cfg.JWTSecret)
 	if err != nil {
 		return nil, err
 	}

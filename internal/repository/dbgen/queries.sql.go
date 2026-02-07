@@ -7,8 +7,11 @@ package dbgen
 
 import (
 	"context"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 )
 
 const createBill = `-- name: CreateBill :one
@@ -20,12 +23,12 @@ INSERT INTO bills (
 `
 
 type CreateBillParams struct {
-	UserID      pgtype.UUID        `json:"user_id"`
-	Amount      pgtype.Numeric     `json:"amount"`
-	Description string             `json:"description"`
-	BillType    int16              `json:"bill_type"`
-	Category    int32              `json:"category"`
-	RecordDate  pgtype.Timestamptz `json:"record_date"`
+	UserID      uuid.UUID       `json:"user_id"`
+	Amount      decimal.Decimal `json:"amount"`
+	Description string          `json:"description"`
+	BillType    int16           `json:"bill_type"`
+	Category    int32           `json:"category"`
+	RecordDate  time.Time       `json:"record_date"`
 }
 
 func (q *Queries) CreateBill(ctx context.Context, arg CreateBillParams) (Bill, error) {
@@ -86,8 +89,8 @@ WHERE id = $1 AND user_id = $2
 `
 
 type DeleteBillParams struct {
-	ID     int64       `json:"id"`
-	UserID pgtype.UUID `json:"user_id"`
+	ID     int64     `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) DeleteBill(ctx context.Context, arg DeleteBillParams) error {
@@ -109,9 +112,9 @@ ORDER BY date DESC
 `
 
 type GetDailyStatsParams struct {
-	UserID    pgtype.UUID        `json:"user_id"`
-	StartTime pgtype.Timestamptz `json:"start_time"`
-	EndTime   pgtype.Timestamptz `json:"end_time"`
+	UserID    uuid.UUID `json:"user_id"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
 }
 
 type GetDailyStatsRow struct {
@@ -153,9 +156,9 @@ WHERE user_id = $1
 `
 
 type GetMonthlyStatsParams struct {
-	UserID    pgtype.UUID        `json:"user_id"`
-	StartTime pgtype.Timestamptz `json:"start_time"`
-	EndTime   pgtype.Timestamptz `json:"end_time"`
+	UserID    uuid.UUID `json:"user_id"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
 }
 
 type GetMonthlyStatsRow struct {
@@ -195,7 +198,7 @@ SELECT id, username, email, password, created_at, updated_at FROM users
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserById(ctx context.Context, id pgtype.UUID) (User, error) {
+func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserById, id)
 	var i User
 	err := row.Scan(
@@ -217,9 +220,9 @@ LIMIT $2 OFFSET $3
 `
 
 type ListBillsParams struct {
-	UserID pgtype.UUID `json:"user_id"`
-	Limit  int32       `json:"limit"`
-	Offset int32       `json:"offset"`
+	UserID uuid.UUID `json:"user_id"`
+	Limit  int32     `json:"limit"`
+	Offset int32     `json:"offset"`
 }
 
 func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, error) {
@@ -265,13 +268,13 @@ RETURNING id, user_id, amount, description, bill_type, category, record_date, cr
 `
 
 type UpdateBillParams struct {
-	ID          int64              `json:"id"`
-	Amount      pgtype.Numeric     `json:"amount"`
-	Description string             `json:"description"`
-	BillType    int16              `json:"bill_type"`
-	Category    int32              `json:"category"`
-	RecordDate  pgtype.Timestamptz `json:"record_date"`
-	UserID      pgtype.UUID        `json:"user_id"`
+	ID          int64           `json:"id"`
+	Amount      decimal.Decimal `json:"amount"`
+	Description string          `json:"description"`
+	BillType    int16           `json:"bill_type"`
+	Category    int32           `json:"category"`
+	RecordDate  time.Time       `json:"record_date"`
+	UserID      uuid.UUID       `json:"user_id"`
 }
 
 // sqlc 会自动处理 updated_at (通过数据库触发器)，不需要手动传

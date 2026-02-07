@@ -5,26 +5,29 @@
 package dbgen
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 type Bill struct {
-	ID          int64              `json:"id"`
-	UserID      pgtype.UUID        `json:"user_id"`
-	Amount      pgtype.Numeric     `json:"amount"`
-	Description string             `json:"description"`
-	BillType    int16              `json:"bill_type"`
-	Category    int32              `json:"category"`
-	RecordDate  pgtype.Timestamptz `json:"record_date"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	ID          int64           `json:"id"`
+	UserID      uuid.UUID       `json:"user_id"`
+	Amount      decimal.Decimal `json:"amount"`
+	Description string          `json:"description"`
+	BillType    int16           `json:"bill_type"`
+	Category    int32           `json:"category"`
+	RecordDate  time.Time       `json:"record_date"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type User struct {
-	ID        pgtype.UUID        `json:"id"`
-	Username  string             `json:"username"`
-	Email     string             `json:"email"`
-	Password  string             `json:"password"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID        uuid.UUID `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
