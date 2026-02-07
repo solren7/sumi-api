@@ -99,11 +99,15 @@ func (e *LogEntry) Info(msg string)  { e.write(zerolog.InfoLevel, msg) }
 func (e *LogEntry) Debug(msg string) { e.write(zerolog.DebugLevel, msg) }
 func (e *LogEntry) Warn(msg string)  { e.write(zerolog.WarnLevel, msg) }
 func (e *LogEntry) Error(msg string) { e.write(zerolog.ErrorLevel, msg) }
+func (e *LogEntry) Fatal(msg string) { e.write(zerolog.FatalLevel, msg) }
+func (e *LogEntry) Panic(msg string) { e.write(zerolog.PanicLevel, msg) }
 
 func (e *LogEntry) Infof(format string, args ...any)  { e.writef(zerolog.InfoLevel, format, args...) }
 func (e *LogEntry) Debugf(format string, args ...any) { e.writef(zerolog.DebugLevel, format, args...) }
 func (e *LogEntry) Warnf(format string, args ...any)  { e.writef(zerolog.WarnLevel, format, args...) }
 func (e *LogEntry) Errorf(format string, args ...any) { e.writef(zerolog.ErrorLevel, format, args...) }
+func (e *LogEntry) Fatalf(format string, args ...any) { e.writef(zerolog.FatalLevel, format, args...) }
+func (e *LogEntry) Panicf(format string, args ...any) { e.writef(zerolog.PanicLevel, format, args...) }
 
 // ============================================================
 // Internal write helpers
