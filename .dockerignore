@@ -1,0 +1,14 @@
+.git
+.github
+.vscode
+.claude
+bin
+tmp
+coverage.out
+*.log
+.env
+docs/swagger.json
+docs/swagger.yaml
+README.md
+AGENTS.md
+CLAUDE.md
