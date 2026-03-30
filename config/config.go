@@ -41,10 +41,7 @@ type RedisConfig struct {
 }
 
 func NewConfig() *Config {
-	err := godotenv.Load()
-	if err != nil {
-		panic("Error loading .env file")
-	}
+	_ = godotenv.Load()
 	var cfg Config
 
 	if err := env.Parse(&cfg); err != nil {
