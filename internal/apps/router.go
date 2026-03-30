@@ -1,19 +1,54 @@
 package apps
 
 import (
+	docs "fiber/docs"
 	"fiber/internal/handlers"
 	"fiber/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
-	"github.com/gofiber/fiber/v3/middleware/logger"
 )
 
 func RegisterRoutes(app *fiber.App, handler *handlers.Handler, _ any) {
 	// Middlewares
-	app.Use(logger.New())
 	app.Use(cors.New())
 	app.Use(middleware.LogxMeta)
+	app.Use(middleware.RequestLog())
+	app.Get("/openapi.yaml", func(c fiber.Ctx) error {
+		return c.SendFile("./docs/openapi.yaml")
+	})
+	app.Get("/swagger/doc.json", func(c fiber.Ctx) error {
+		c.Type("json", "utf-8")
+		return c.SendString(docs.SwaggerInfo.ReadDoc())
+	})
+	app.Get("/swagger", func(c fiber.Ctx) error {
+		return c.Redirect().Status(fiber.StatusMovedPermanently).To("/swagger/index.html")
+	})
+	app.Get("/swagger/index.html", func(c fiber.Ctx) error {
+		c.Type("html", "utf-8")
+		return c.SendString(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sumi API Swagger</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function () {
+      SwaggerUIBundle({
+        url: "/swagger/doc.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        persistAuthorization: true
+      });
+    };
+  </script>
+</body>
+</html>`)
+	})
 
 	// Routes
 	api := app.Group("/api")

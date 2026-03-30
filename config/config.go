@@ -11,6 +11,7 @@ type Config struct {
 	DBDSN                  string        `env:"DB_DSN"`
 	RedisConfig            RedisConfig
 	ServerPort             string        `env:"SERVER_PORT" envDefault:":3000"`
+	LogFormat              string        `env:"LOG_FORMAT" envDefault:"console"`
 	JWTSecret              string        `env:"JWT_SECRET" envDefault:"secret"`
 	AccessTokenTTL         time.Duration `env:"ACCESS_TOKEN_TTL" envDefault:"15m"`
 	RefreshTokenTTL        time.Duration `env:"REFRESH_TOKEN_TTL" envDefault:"720h"`

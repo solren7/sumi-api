@@ -20,6 +20,8 @@ import (
 )
 
 func StartAPIServer(cfg *config.Config) {
+	logx.Configure(cfg.LogFormat)
+
 	app := fiber.New(fiber.Config{
 		AppName:      "MyFiberApp",
 		ReadTimeout:  10 * time.Second,

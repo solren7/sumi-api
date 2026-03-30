@@ -9,6 +9,17 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+// GetMonthlyStats godoc
+// @Summary Get monthly stats
+// @Tags Stats
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param month query string false "Month in YYYY-MM"
+// @Success 200 {object} services.MonthlyStatsOutput
+// @Failure 401 {object} ErrorResponse
+// @Router /api/stats/monthly [get]
+// @Router /api/stats/home [get]
 func (h *Handler) GetMonthlyStats(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -22,6 +33,16 @@ func (h *Handler) GetMonthlyStats(c fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
+// GetDailyStats godoc
+// @Summary Get daily stats
+// @Tags Stats
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param month query string false "Month in YYYY-MM"
+// @Success 200 {object} services.DailyStatsOutput
+// @Failure 401 {object} ErrorResponse
+// @Router /api/stats/daily [get]
 func (h *Handler) GetDailyStats(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -35,6 +56,18 @@ func (h *Handler) GetDailyStats(c fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
+// GetCategoryStats godoc
+// @Summary Get category stats
+// @Tags Stats
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param month query string false "Month in YYYY-MM"
+// @Param type query int false "Transaction type: 1 expense, 2 income" default(1)
+// @Success 200 {object} services.CategoryStatsOutput
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/stats/category [get]
 func (h *Handler) GetCategoryStats(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {

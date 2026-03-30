@@ -34,6 +34,17 @@ type CreatedAPIKeyResponse struct {
 	Key string `json:"key"`
 }
 
+// CreateAPIKey godoc
+// @Summary Create API key
+// @Tags API Keys
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateAPIKeyRequest true "API key payload"
+// @Success 201 {object} CreatedAPIKeyResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/api-keys [post]
 func (h *Handler) CreateAPIKey(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -69,6 +80,14 @@ func (h *Handler) CreateAPIKey(c fiber.Ctx) error {
 	})
 }
 
+// ListAPIKeys godoc
+// @Summary List API keys
+// @Tags API Keys
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} APIKeyResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/api-keys [get]
 func (h *Handler) ListAPIKeys(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -87,6 +106,16 @@ func (h *Handler) ListAPIKeys(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// RevokeAPIKey godoc
+// @Summary Revoke API key
+// @Tags API Keys
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "API key UUID"
+// @Success 204
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/api-keys/{id}/revoke [post]
 func (h *Handler) RevokeAPIKey(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -104,6 +133,16 @@ func (h *Handler) RevokeAPIKey(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// DeleteAPIKey godoc
+// @Summary Delete API key
+// @Tags API Keys
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "API key UUID"
+// @Success 204
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/api-keys/{id} [delete]
 func (h *Handler) DeleteAPIKey(c fiber.Ctx) error {
 	return h.RevokeAPIKey(c)
 }

@@ -60,6 +60,19 @@ func toBillResponse(b dbgen.Bill) BillResponse {
 	}
 }
 
+// CreateBill godoc
+// @Summary Create transaction
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param request body CreateBillRequest true "Transaction payload"
+// @Success 201 {object} BillResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/transactions [post]
+// @Router /api/bills [post]
 func (h *Handler) CreateBill(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -91,6 +104,18 @@ func (h *Handler) CreateBill(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(toBillResponse(*bill))
 }
 
+// GetBill godoc
+// @Summary Get transaction
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param id path int true "Transaction ID"
+// @Success 200 {object} BillResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/transactions/{id} [get]
+// @Router /api/bills/{id} [get]
 func (h *Handler) GetBill(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -110,6 +135,23 @@ func (h *Handler) GetBill(c fiber.Ctx) error {
 	return c.JSON(toBillResponse(*bill))
 }
 
+// ListBills godoc
+// @Summary List transactions
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param limit query int false "Page size" default(20)
+// @Param offset query int false "Offset" default(0)
+// @Param type query int false "Transaction type: 1 expense, 2 income"
+// @Param category_id query int false "Category ID"
+// @Param currency query string false "Currency code"
+// @Param start_time query string false "Start datetime (RFC3339)"
+// @Param end_time query string false "End datetime (RFC3339)"
+// @Success 200 {array} BillResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/transactions [get]
+// @Router /api/bills [get]
 func (h *Handler) ListBills(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -169,6 +211,21 @@ func (h *Handler) ListBills(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// UpdateBill godoc
+// @Summary Update transaction
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param id path int true "Transaction ID"
+// @Param request body UpdateBillRequest true "Transaction payload"
+// @Success 200 {object} BillResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/transactions/{id} [put]
+// @Router /api/bills/{id} [put]
 func (h *Handler) UpdateBill(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {
@@ -206,6 +263,18 @@ func (h *Handler) UpdateBill(c fiber.Ctx) error {
 	return c.JSON(toBillResponse(*bill))
 }
 
+// DeleteBill godoc
+// @Summary Delete transaction
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Security ApiKeyAuth
+// @Param id path int true "Transaction ID"
+// @Success 204
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/transactions/{id} [delete]
+// @Router /api/bills/{id} [delete]
 func (h *Handler) DeleteBill(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {

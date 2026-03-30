@@ -2,13 +2,17 @@
 BINARY_NAME=bin/server
 MAIN_PATH=main.go
 
-.PHONY: run build generate api help
+.PHONY: run build generate swagger api help
 
 # 1. 生成 SQL 代码
 # 这里直接在根目录调用 sqlc，避免嵌套 make 带来的路径混乱
 generate:
 	@echo "Generating SQLC code..."
 	sqlc generate
+
+swagger:
+	@echo "Generating Swagger docs..."
+	swag init -g swagger.go -o docs
 
 # 2. 运行主程序
 run:
@@ -28,6 +32,7 @@ build:
 help:
 	@echo "Usage:"
 	@echo "  make generate  - Run sqlc generate in /sqlc directory"
+	@echo "  make swagger   - Generate Swagger docs with swaggo/swag"
 	@echo "  make run       - Run the application"
 	@echo "  make api       - Alias for running the API server"
 	@echo "  make build     - Build the server binary"

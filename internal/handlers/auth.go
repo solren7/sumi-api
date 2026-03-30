@@ -72,6 +72,15 @@ func sessionMeta(c fiber.Ctx) services.SessionMeta {
 	return meta
 }
 
+// CheckEmail godoc
+// @Summary Check whether an email is already registered
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body CheckEmailRequest true "Email payload"
+// @Success 200 {object} CheckEmailResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /api/auth/check-email [post]
 func (h *Handler) CheckEmail(c fiber.Ctx) error {
 	req := new(CheckEmailRequest)
 	if err := c.Bind().Body(req); err != nil {
@@ -86,6 +95,16 @@ func (h *Handler) CheckEmail(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"exists": exists})
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body AuthRequest true "Register payload"
+// @Success 201 {object} AuthResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Router /api/auth/register [post]
 func (h *Handler) Register(c fiber.Ctx) error {
 	req := new(AuthRequest)
 	if err := c.Bind().Body(req); err != nil {
@@ -116,6 +135,16 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	})
 }
 
+// Login godoc
+// @Summary Login with email and password
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body AuthRequest true "Login payload"
+// @Success 200 {object} AuthResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/auth/login [post]
 func (h *Handler) Login(c fiber.Ctx) error {
 	req := new(AuthRequest)
 	if err := c.Bind().Body(req); err != nil {
@@ -142,6 +171,16 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	})
 }
 
+// Refresh godoc
+// @Summary Refresh access token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token payload"
+// @Success 200 {object} AuthResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/auth/refresh [post]
 func (h *Handler) Refresh(c fiber.Ctx) error {
 	req := new(RefreshTokenRequest)
 	if err := c.Bind().Body(req); err != nil {
@@ -168,6 +207,15 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 	})
 }
 
+// Logout godoc
+// @Summary Logout current refresh token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token payload"
+// @Success 204
+// @Failure 400 {object} ErrorResponse
+// @Router /api/auth/logout [post]
 func (h *Handler) Logout(c fiber.Ctx) error {
 	req := new(RefreshTokenRequest)
 	if err := c.Bind().Body(req); err != nil {
@@ -180,6 +228,14 @@ func (h *Handler) Logout(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// Me godoc
+// @Summary Get current user
+// @Tags Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} UserResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/auth/me [get]
 func (h *Handler) Me(c fiber.Ctx) error {
 	userID, err := middleware.UserID(c)
 	if err != nil {

@@ -2,7 +2,9 @@ package logx
 
 import (
 	"context"
+	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,11 +111,25 @@ func releaseEntry(e *LogEntry) {
 var logger zerolog.Logger
 
 func init() {
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-	logger = zerolog.New(output).With().Timestamp().Logger().Hook(metadataHook{})
+	logger = newLogger("console", os.Stdout)
 }
 
 // SetLogger replaces the package-level logger (e.g. for production JSON output).
 func SetLogger(l zerolog.Logger) {
 	logger = l.Hook(metadataHook{})
+}
+
+func Configure(format string) {
+	logger = newLogger(format, os.Stdout)
+}
+
+func newLogger(format string, out io.Writer) zerolog.Logger {
+	var base zerolog.Logger
+	if strings.EqualFold(strings.TrimSpace(format), "json") {
+		base = zerolog.New(out).With().Timestamp().Logger()
+	} else {
+		console := zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}
+		base = zerolog.New(console).With().Timestamp().Logger()
+	}
+	return base.Hook(metadataHook{})
 }
