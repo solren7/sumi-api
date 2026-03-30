@@ -3,40 +3,96 @@ package middleware
 import (
 	"strings"
 
-	"fiber/config"
-	"fiber/pkg/utils"
+	"fiber/internal/services"
+	"fiber/pkg/errorx"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
-func AuthMiddleware(cfg *config.Config) fiber.Handler {
+const (
+	localUserID   = "user_id"
+	localEmail    = "email"
+	localAuthType = "auth_type"
+	localScopes   = "scopes"
+)
+
+func JWTOnly(auth *services.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Missing authorization header",
-			})
-		}
-
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid authorization header format",
-			})
-		}
-
-		tokenString := parts[1]
-		claims, err := utils.ParseToken(tokenString, cfg.JWTSecret)
+		tokenString, err := extractBearerToken(c.Get("Authorization"))
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid or expired token",
-			})
+			return err
 		}
 
-		// Store user info in context
-		c.Locals("user_id", claims.UserID)
-		c.Locals("email", claims.Email)
+		claims, err := auth.ParseAccessToken(tokenString)
+		if err != nil {
+			return err
+		}
 
+		userID, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			return errorx.ErrUnauthorized
+		}
+
+		c.Locals(localUserID, userID)
+		c.Locals(localEmail, claims.Email)
+		c.Locals(localAuthType, "jwt")
 		return c.Next()
 	}
+}
+
+func JWTOrAPIKey(auth *services.AuthService, apiKeys *services.APIKeyService, requiredScopes ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if authHeader := c.Get("Authorization"); authHeader != "" {
+			tokenString, err := extractBearerToken(authHeader)
+			if err != nil {
+				return err
+			}
+			claims, err := auth.ParseAccessToken(tokenString)
+			if err != nil {
+				return err
+			}
+			userID, err := uuid.Parse(claims.UserID)
+			if err != nil {
+				return errorx.ErrUnauthorized
+			}
+
+			c.Locals(localUserID, userID)
+			c.Locals(localEmail, claims.Email)
+			c.Locals(localAuthType, "jwt")
+			return c.Next()
+		}
+
+		apiKey := strings.TrimSpace(c.Get("X-API-Key"))
+		if apiKey == "" {
+			return errorx.ErrUnauthorized
+		}
+
+		identity, err := apiKeys.Validate(c.Context(), apiKey, requiredScopes)
+		if err != nil {
+			return err
+		}
+
+		c.Locals(localUserID, identity.UserID)
+		c.Locals(localAuthType, "api_key")
+		c.Locals(localScopes, identity.Scopes)
+		return c.Next()
+	}
+}
+
+func UserID(c fiber.Ctx) (uuid.UUID, error) {
+	value := c.Locals(localUserID)
+	userID, ok := value.(uuid.UUID)
+	if !ok {
+		return uuid.Nil, errorx.ErrUnauthorized
+	}
+	return userID, nil
+}
+
+func extractBearerToken(authHeader string) (string, error) {
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", errorx.ErrUnauthorized
+	}
+	return parts[1], nil
 }

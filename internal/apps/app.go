@@ -54,7 +54,7 @@ func StartAPIServer(cfg *config.Config) {
 
 	// 3. Initialize Services
 	queries := dbgen.New(dbPool)
-	svc := services.NewService(queries, cfg)
+	svc := services.NewService(queries, cfg, rdb)
 
 	// 4. Initialize Handlers
 	handler := handlers.NewHandler(svc, cfg)

@@ -14,69 +14,166 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const createBill = `-- name: CreateBill :one
-INSERT INTO bills (
-    user_id, amount, description, bill_type, category, record_date
+const createAPIKey = `-- name: CreateAPIKey :one
+INSERT INTO api_keys (
+    user_id, name, key_prefix, key_hash, scopes, expires_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6
-) RETURNING id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at
+) RETURNING id, user_id, name, key_prefix, key_hash, scopes, status, last_used_at, expires_at, created_at, updated_at
 `
 
-type CreateBillParams struct {
-	UserID      uuid.UUID       `json:"user_id"`
-	Amount      decimal.Decimal `json:"amount"`
-	Description string          `json:"description"`
-	BillType    int16           `json:"bill_type"`
-	Category    int32           `json:"category"`
-	RecordDate  time.Time       `json:"record_date"`
+type CreateAPIKeyParams struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	Name      string             `json:"name"`
+	KeyPrefix string             `json:"key_prefix"`
+	KeyHash   string             `json:"key_hash"`
+	Scopes    []string           `json:"scopes"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
-func (q *Queries) CreateBill(ctx context.Context, arg CreateBillParams) (Bill, error) {
-	row := q.db.QueryRow(ctx, createBill,
+func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, createAPIKey,
 		arg.UserID,
-		arg.Amount,
-		arg.Description,
-		arg.BillType,
-		arg.Category,
-		arg.RecordDate,
+		arg.Name,
+		arg.KeyPrefix,
+		arg.KeyHash,
+		arg.Scopes,
+		arg.ExpiresAt,
 	)
-	var i Bill
+	var i ApiKey
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.Amount,
-		&i.Description,
-		&i.BillType,
-		&i.Category,
-		&i.RecordDate,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.Scopes,
+		&i.Status,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const createBill = `-- name: CreateBill :one
+INSERT INTO bills (
+    user_id, type, amount, currency, category_id, description, occurred_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+) RETURNING id, user_id, type, amount, currency, category_id, description, occurred_at, created_at, updated_at
+`
+
+type CreateBillParams struct {
+	UserID      uuid.UUID       `json:"user_id"`
+	Type        int16           `json:"type"`
+	Amount      decimal.Decimal `json:"amount"`
+	Currency    string          `json:"currency"`
+	CategoryID  int64           `json:"category_id"`
+	Description string          `json:"description"`
+	OccurredAt  time.Time       `json:"occurred_at"`
+}
+
+func (q *Queries) CreateBill(ctx context.Context, arg CreateBillParams) (Bill, error) {
+	row := q.db.QueryRow(ctx, createBill,
+		arg.UserID,
+		arg.Type,
+		arg.Amount,
+		arg.Currency,
+		arg.CategoryID,
+		arg.Description,
+		arg.OccurredAt,
+	)
+	var i Bill
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Amount,
+		&i.Currency,
+		&i.CategoryID,
+		&i.Description,
+		&i.OccurredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createRefreshToken = `-- name: CreateRefreshToken :one
+INSERT INTO refresh_tokens (
+    user_id, token_hash, device_id, user_agent, ip_address, expires_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+) RETURNING id, user_id, token_hash, device_id, user_agent, ip_address, expires_at, revoked_at, created_at
+`
+
+type CreateRefreshTokenParams struct {
+	UserID    uuid.UUID `json:"user_id"`
+	TokenHash string    `json:"token_hash"`
+	DeviceID  *string   `json:"device_id"`
+	UserAgent *string   `json:"user_agent"`
+	IpAddress *string   `json:"ip_address"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, createRefreshToken,
+		arg.UserID,
+		arg.TokenHash,
+		arg.DeviceID,
+		arg.UserAgent,
+		arg.IpAddress,
+		arg.ExpiresAt,
+	)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.DeviceID,
+		&i.UserAgent,
+		&i.IpAddress,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-    username, email, password
+    email, username, password_hash, default_currency, timezone
 ) VALUES (
-    $1, $2, $3
-) RETURNING id, username, email, password, created_at, updated_at
+    $1, $2, $3, $4, $5
+) RETURNING id, email, username, password_hash, default_currency, timezone, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email           string `json:"email"`
+	Username        string `json:"username"`
+	PasswordHash    string `json:"password_hash"`
+	DefaultCurrency string `json:"default_currency"`
+	Timezone        string `json:"timezone"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.Password)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Email,
+		arg.Username,
+		arg.PasswordHash,
+		arg.DefaultCurrency,
+		arg.Timezone,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Username,
+		&i.PasswordHash,
+		&i.DefaultCurrency,
+		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -98,43 +195,183 @@ func (q *Queries) DeleteBill(ctx context.Context, arg DeleteBillParams) error {
 	return err
 }
 
-const getDailyStats = `-- name: GetDailyStats :many
-SELECT 
-    record_date::DATE as date, -- 强转为日期，去掉时分秒
-    COALESCE(SUM(CASE WHEN bill_type = 2 THEN amount ELSE 0 END), 0)::DECIMAL as daily_income,
-    COALESCE(SUM(CASE WHEN bill_type = 1 THEN amount ELSE 0 END), 0)::DECIMAL as daily_expense
-FROM bills
-WHERE user_id = $1 
-  AND record_date >= $2::TIMESTAMPTZ 
-  AND record_date <= $3::TIMESTAMPTZ
-GROUP BY record_date::DATE
-ORDER BY date DESC
+const deleteExpiredRefreshTokens = `-- name: DeleteExpiredRefreshTokens :exec
+DELETE FROM refresh_tokens
+WHERE expires_at < NOW() OR revoked_at IS NOT NULL
 `
 
-type GetDailyStatsParams struct {
+func (q *Queries) DeleteExpiredRefreshTokens(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredRefreshTokens)
+	return err
+}
+
+const getAPIKeyByID = `-- name: GetAPIKeyByID :one
+SELECT id, user_id, name, key_prefix, key_hash, scopes, status, last_used_at, expires_at, created_at, updated_at FROM api_keys
+WHERE id = $1 AND user_id = $2
+LIMIT 1
+`
+
+type GetAPIKeyByIDParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetAPIKeyByID(ctx context.Context, arg GetAPIKeyByIDParams) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, getAPIKeyByID, arg.ID, arg.UserID)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.Scopes,
+		&i.Status,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAPIKeyByPrefix = `-- name: GetAPIKeyByPrefix :one
+SELECT id, user_id, name, key_prefix, key_hash, scopes, status, last_used_at, expires_at, created_at, updated_at FROM api_keys
+WHERE key_prefix = $1
+LIMIT 1
+`
+
+func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, keyPrefix string) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, getAPIKeyByPrefix, keyPrefix)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.Scopes,
+		&i.Status,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getBillByID = `-- name: GetBillByID :one
+SELECT id, user_id, type, amount, currency, category_id, description, occurred_at, created_at, updated_at FROM bills
+WHERE id = $1 AND user_id = $2
+LIMIT 1
+`
+
+type GetBillByIDParams struct {
+	ID     int64     `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetBillByID(ctx context.Context, arg GetBillByIDParams) (Bill, error) {
+	row := q.db.QueryRow(ctx, getBillByID, arg.ID, arg.UserID)
+	var i Bill
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Amount,
+		&i.Currency,
+		&i.CategoryID,
+		&i.Description,
+		&i.OccurredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCategoryByID = `-- name: GetCategoryByID :one
+SELECT id, user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active, created_at, updated_at FROM categories
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetCategoryByID(ctx context.Context, id int64) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategoryByID, id)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Name,
+		&i.ParentID,
+		&i.Level,
+		&i.SortOrder,
+		&i.Icon,
+		&i.IsSystem,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCategoryStats = `-- name: GetCategoryStats :many
+SELECT
+    parent.id AS parent_category_id,
+    parent.name AS parent_category_name,
+    child.id AS category_id,
+    child.name AS category_name,
+    bills.currency,
+    COALESCE(SUM(bills.amount), 0)::DECIMAL AS amount
+FROM bills
+JOIN categories child ON child.id = bills.category_id
+LEFT JOIN categories parent ON parent.id = child.parent_id
+WHERE bills.user_id = $1
+  AND bills.type = $2
+  AND bills.occurred_at >= $3
+  AND bills.occurred_at < $4
+GROUP BY parent.id, parent.name, child.id, child.name, bills.currency
+ORDER BY amount DESC, category_id ASC
+`
+
+type GetCategoryStatsParams struct {
 	UserID    uuid.UUID `json:"user_id"`
+	Type      int16     `json:"type"`
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
 }
 
-type GetDailyStatsRow struct {
-	Date         pgtype.Date    `json:"date"`
-	DailyIncome  pgtype.Numeric `json:"daily_income"`
-	DailyExpense pgtype.Numeric `json:"daily_expense"`
+type GetCategoryStatsRow struct {
+	ParentCategoryID   *int64         `json:"parent_category_id"`
+	ParentCategoryName *string        `json:"parent_category_name"`
+	CategoryID         int64          `json:"category_id"`
+	CategoryName       string         `json:"category_name"`
+	Currency           string         `json:"currency"`
+	Amount             pgtype.Numeric `json:"amount"`
 }
 
-// 首页列表：核心变化在这里
-// 我们需要把 record_date 强转为 DATE 类型来分组
-func (q *Queries) GetDailyStats(ctx context.Context, arg GetDailyStatsParams) ([]GetDailyStatsRow, error) {
-	rows, err := q.db.Query(ctx, getDailyStats, arg.UserID, arg.StartTime, arg.EndTime)
+func (q *Queries) GetCategoryStats(ctx context.Context, arg GetCategoryStatsParams) ([]GetCategoryStatsRow, error) {
+	rows, err := q.db.Query(ctx, getCategoryStats,
+		arg.UserID,
+		arg.Type,
+		arg.StartTime,
+		arg.EndTime,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetDailyStatsRow
+	var items []GetCategoryStatsRow
 	for rows.Next() {
-		var i GetDailyStatsRow
-		if err := rows.Scan(&i.Date, &i.DailyIncome, &i.DailyExpense); err != nil {
+		var i GetCategoryStatsRow
+		if err := rows.Scan(
+			&i.ParentCategoryID,
+			&i.ParentCategoryName,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.Currency,
+			&i.Amount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -145,14 +382,75 @@ func (q *Queries) GetDailyStats(ctx context.Context, arg GetDailyStatsParams) ([
 	return items, nil
 }
 
-const getMonthlyStats = `-- name: GetMonthlyStats :one
-SELECT 
-    COALESCE(SUM(CASE WHEN bill_type = 2 THEN amount ELSE 0 END), 0)::DECIMAL as total_income,
-    COALESCE(SUM(CASE WHEN bill_type = 1 THEN amount ELSE 0 END), 0)::DECIMAL as total_expense
+const getDailyStats = `-- name: GetDailyStats :many
+SELECT
+    timezone($1::text, occurred_at)::date AS date,
+    currency,
+    COALESCE(SUM(CASE WHEN type = 2 THEN amount ELSE 0 END), 0)::DECIMAL AS income,
+    COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0)::DECIMAL AS expense
 FROM bills
-WHERE user_id = $1 
-  AND record_date >= $2::TIMESTAMPTZ 
-  AND record_date <= $3::TIMESTAMPTZ
+WHERE user_id = $2
+  AND occurred_at >= $3
+  AND occurred_at < $4
+GROUP BY timezone($1, occurred_at)::date, currency
+ORDER BY date ASC, currency ASC
+`
+
+type GetDailyStatsParams struct {
+	UserTimezone string    `json:"user_timezone"`
+	UserID       uuid.UUID `json:"user_id"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
+type GetDailyStatsRow struct {
+	Date     pgtype.Date    `json:"date"`
+	Currency string         `json:"currency"`
+	Income   pgtype.Numeric `json:"income"`
+	Expense  pgtype.Numeric `json:"expense"`
+}
+
+func (q *Queries) GetDailyStats(ctx context.Context, arg GetDailyStatsParams) ([]GetDailyStatsRow, error) {
+	rows, err := q.db.Query(ctx, getDailyStats,
+		arg.UserTimezone,
+		arg.UserID,
+		arg.StartTime,
+		arg.EndTime,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDailyStatsRow
+	for rows.Next() {
+		var i GetDailyStatsRow
+		if err := rows.Scan(
+			&i.Date,
+			&i.Currency,
+			&i.Income,
+			&i.Expense,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMonthlyStats = `-- name: GetMonthlyStats :many
+SELECT
+    currency,
+    COALESCE(SUM(CASE WHEN type = 2 THEN amount ELSE 0 END), 0)::DECIMAL AS total_income,
+    COALESCE(SUM(CASE WHEN type = 1 THEN amount ELSE 0 END), 0)::DECIMAL AS total_expense
+FROM bills
+WHERE user_id = $1
+  AND occurred_at >= $2
+  AND occurred_at < $3
+GROUP BY currency
+ORDER BY currency ASC
 `
 
 type GetMonthlyStatsParams struct {
@@ -162,21 +460,58 @@ type GetMonthlyStatsParams struct {
 }
 
 type GetMonthlyStatsRow struct {
+	Currency     string         `json:"currency"`
 	TotalIncome  pgtype.Numeric `json:"total_income"`
 	TotalExpense pgtype.Numeric `json:"total_expense"`
 }
 
-// 首页顶部统计：依然是按时间范围查，逻辑不变
-func (q *Queries) GetMonthlyStats(ctx context.Context, arg GetMonthlyStatsParams) (GetMonthlyStatsRow, error) {
-	row := q.db.QueryRow(ctx, getMonthlyStats, arg.UserID, arg.StartTime, arg.EndTime)
-	var i GetMonthlyStatsRow
-	err := row.Scan(&i.TotalIncome, &i.TotalExpense)
+func (q *Queries) GetMonthlyStats(ctx context.Context, arg GetMonthlyStatsParams) ([]GetMonthlyStatsRow, error) {
+	rows, err := q.db.Query(ctx, getMonthlyStats, arg.UserID, arg.StartTime, arg.EndTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMonthlyStatsRow
+	for rows.Next() {
+		var i GetMonthlyStatsRow
+		if err := rows.Scan(&i.Currency, &i.TotalIncome, &i.TotalExpense); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRefreshTokenByHash = `-- name: GetRefreshTokenByHash :one
+SELECT id, user_id, token_hash, device_id, user_agent, ip_address, expires_at, revoked_at, created_at FROM refresh_tokens
+WHERE token_hash = $1
+LIMIT 1
+`
+
+func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error) {
+	row := q.db.QueryRow(ctx, getRefreshTokenByHash, tokenHash)
+	var i RefreshToken
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.DeviceID,
+		&i.UserAgent,
+		&i.IpAddress,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password, created_at, updated_at FROM users
-WHERE email = $1 LIMIT 1
+SELECT id, email, username, password_hash, default_currency, timezone, created_at, updated_at FROM users
+WHERE email = $1
+LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -184,9 +519,11 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Username,
+		&i.PasswordHash,
+		&i.DefaultCurrency,
+		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -194,8 +531,9 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, username, email, password, created_at, updated_at FROM users
-WHERE id = $1 LIMIT 1
+SELECT id, email, username, password_hash, default_currency, timezone, created_at, updated_at FROM users
+WHERE id = $1
+LIMIT 1
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
@@ -203,45 +541,42 @@ func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Username,
+		&i.PasswordHash,
+		&i.DefaultCurrency,
+		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const listBills = `-- name: ListBills :many
-SELECT id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at FROM bills
+const listAPIKeysByUser = `-- name: ListAPIKeysByUser :many
+SELECT id, user_id, name, key_prefix, key_hash, scopes, status, last_used_at, expires_at, created_at, updated_at FROM api_keys
 WHERE user_id = $1
-ORDER BY record_date DESC
-LIMIT $2 OFFSET $3
+ORDER BY created_at DESC
 `
 
-type ListBillsParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	Limit  int32     `json:"limit"`
-	Offset int32     `json:"offset"`
-}
-
-func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, error) {
-	rows, err := q.db.Query(ctx, listBills, arg.UserID, arg.Limit, arg.Offset)
+func (q *Queries) ListAPIKeysByUser(ctx context.Context, userID uuid.UUID) ([]ApiKey, error) {
+	rows, err := q.db.Query(ctx, listAPIKeysByUser, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Bill
+	var items []ApiKey
 	for rows.Next() {
-		var i Bill
+		var i ApiKey
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.Amount,
-			&i.Description,
-			&i.BillType,
-			&i.Category,
-			&i.RecordDate,
+			&i.Name,
+			&i.KeyPrefix,
+			&i.KeyHash,
+			&i.Scopes,
+			&i.Status,
+			&i.LastUsedAt,
+			&i.ExpiresAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -255,48 +590,194 @@ func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, e
 	return items, nil
 }
 
+const listBills = `-- name: ListBills :many
+SELECT id, user_id, type, amount, currency, category_id, description, occurred_at, created_at, updated_at FROM bills
+WHERE user_id = $1
+  AND ($2::smallint IS NULL OR type = $2::smallint)
+  AND ($3::bigint IS NULL OR category_id = $3::bigint)
+  AND ($4::char(3) IS NULL OR currency = $4::char(3))
+  AND ($5::timestamptz IS NULL OR occurred_at >= $5::timestamptz)
+  AND ($6::timestamptz IS NULL OR occurred_at < $6::timestamptz)
+ORDER BY occurred_at DESC
+LIMIT $8 OFFSET $7
+`
+
+type ListBillsParams struct {
+	UserID      uuid.UUID          `json:"user_id"`
+	Type        *int16             `json:"type"`
+	CategoryID  *int64             `json:"category_id"`
+	Currency    *string            `json:"currency"`
+	StartTime   pgtype.Timestamptz `json:"start_time"`
+	EndTime     pgtype.Timestamptz `json:"end_time"`
+	OffsetCount int32              `json:"offset_count"`
+	LimitCount  int32              `json:"limit_count"`
+}
+
+func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, error) {
+	rows, err := q.db.Query(ctx, listBills,
+		arg.UserID,
+		arg.Type,
+		arg.CategoryID,
+		arg.Currency,
+		arg.StartTime,
+		arg.EndTime,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Bill
+	for rows.Next() {
+		var i Bill
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Type,
+			&i.Amount,
+			&i.Currency,
+			&i.CategoryID,
+			&i.Description,
+			&i.OccurredAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSystemCategoriesByType = `-- name: ListSystemCategoriesByType :many
+SELECT id, user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active, created_at, updated_at FROM categories
+WHERE user_id IS NULL
+  AND is_system = TRUE
+  AND is_active = TRUE
+  AND type = $1
+ORDER BY level ASC, parent_id ASC NULLS FIRST, sort_order ASC, id ASC
+`
+
+func (q *Queries) ListSystemCategoriesByType(ctx context.Context, type_ int16) ([]Category, error) {
+	rows, err := q.db.Query(ctx, listSystemCategoriesByType, type_)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Category
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Type,
+			&i.Name,
+			&i.ParentID,
+			&i.Level,
+			&i.SortOrder,
+			&i.Icon,
+			&i.IsSystem,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeAPIKey = `-- name: RevokeAPIKey :exec
+UPDATE api_keys
+SET status = 'revoked'
+WHERE id = $1 AND user_id = $2
+`
+
+type RevokeAPIKeyParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) error {
+	_, err := q.db.Exec(ctx, revokeAPIKey, arg.ID, arg.UserID)
+	return err
+}
+
+const revokeRefreshTokenByHash = `-- name: RevokeRefreshTokenByHash :exec
+UPDATE refresh_tokens
+SET revoked_at = NOW()
+WHERE token_hash = $1
+`
+
+func (q *Queries) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	_, err := q.db.Exec(ctx, revokeRefreshTokenByHash, tokenHash)
+	return err
+}
+
+const updateAPIKeyLastUsedAt = `-- name: UpdateAPIKeyLastUsedAt :exec
+UPDATE api_keys
+SET last_used_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) UpdateAPIKeyLastUsedAt(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateAPIKeyLastUsedAt, id)
+	return err
+}
+
 const updateBill = `-- name: UpdateBill :one
 UPDATE bills
-SET 
-    amount = $2,
-    description = $3,
-    bill_type = $4,
-    category = $5,
-    record_date = $6
-WHERE id = $1 AND user_id = $7
-RETURNING id, user_id, amount, description, bill_type, category, record_date, created_at, updated_at
+SET
+    type = $2,
+    amount = $3,
+    currency = $4,
+    category_id = $5,
+    description = $6,
+    occurred_at = $7
+WHERE id = $1 AND user_id = $8
+RETURNING id, user_id, type, amount, currency, category_id, description, occurred_at, created_at, updated_at
 `
 
 type UpdateBillParams struct {
 	ID          int64           `json:"id"`
+	Type        int16           `json:"type"`
 	Amount      decimal.Decimal `json:"amount"`
+	Currency    string          `json:"currency"`
+	CategoryID  int64           `json:"category_id"`
 	Description string          `json:"description"`
-	BillType    int16           `json:"bill_type"`
-	Category    int32           `json:"category"`
-	RecordDate  time.Time       `json:"record_date"`
+	OccurredAt  time.Time       `json:"occurred_at"`
 	UserID      uuid.UUID       `json:"user_id"`
 }
 
-// sqlc 会自动处理 updated_at (通过数据库触发器)，不需要手动传
 func (q *Queries) UpdateBill(ctx context.Context, arg UpdateBillParams) (Bill, error) {
 	row := q.db.QueryRow(ctx, updateBill,
 		arg.ID,
+		arg.Type,
 		arg.Amount,
+		arg.Currency,
+		arg.CategoryID,
 		arg.Description,
-		arg.BillType,
-		arg.Category,
-		arg.RecordDate,
+		arg.OccurredAt,
 		arg.UserID,
 	)
 	var i Bill
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
+		&i.Type,
 		&i.Amount,
+		&i.Currency,
+		&i.CategoryID,
 		&i.Description,
-		&i.BillType,
-		&i.Category,
-		&i.RecordDate,
+		&i.OccurredAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"fiber/internal/repository/dbgen"
 	"fiber/internal/services"
+	"fiber/middleware"
 	"fiber/pkg/errorx"
 
 	"github.com/gofiber/fiber/v3"
@@ -13,29 +15,32 @@ import (
 )
 
 type CreateBillRequest struct {
+	Type        int16  `json:"type"`
 	Amount      string `json:"amount"`
+	Currency    string `json:"currency"`
+	CategoryID  int64  `json:"category_id"`
 	Description string `json:"description"`
-	BillType    int16  `json:"bill_type"` // 1: Expense, 2: Income
-	Category    int32  `json:"category"`
-	RecordDate  string `json:"record_date"` // Format: "2006-01-02 15:04:05"
+	OccurredAt  string `json:"occurred_at"`
 }
 
 type UpdateBillRequest struct {
+	Type        int16  `json:"type"`
 	Amount      string `json:"amount"`
+	Currency    string `json:"currency"`
+	CategoryID  int64  `json:"category_id"`
 	Description string `json:"description"`
-	BillType    int16  `json:"bill_type"`
-	Category    int32  `json:"category"`
-	RecordDate  string `json:"record_date"`
+	OccurredAt  string `json:"occurred_at"`
 }
 
 type BillResponse struct {
 	ID          int64  `json:"id"`
 	UserID      string `json:"user_id"`
+	Type        int16  `json:"type"`
 	Amount      string `json:"amount"`
+	Currency    string `json:"currency"`
+	CategoryID  int64  `json:"category_id"`
 	Description string `json:"description"`
-	BillType    int16  `json:"bill_type"`
-	Category    int32  `json:"category"`
-	RecordDate  string `json:"record_date"` // Keeping as string for JSON
+	OccurredAt  string `json:"occurred_at"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -43,50 +48,41 @@ type BillResponse struct {
 func toBillResponse(b dbgen.Bill) BillResponse {
 	return BillResponse{
 		ID:          b.ID,
+		UserID:      b.UserID.String(),
+		Type:        b.Type,
 		Amount:      b.Amount.String(),
+		Currency:    b.Currency,
+		CategoryID:  b.CategoryID,
 		Description: b.Description,
-		BillType:    b.BillType,
-		Category:    b.Category,
-		RecordDate:  b.RecordDate.Format(time.RFC3339),
+		OccurredAt:  b.OccurredAt.Format(time.RFC3339),
 		CreatedAt:   b.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   b.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
 func (h *Handler) CreateBill(c fiber.Ctx) error {
+	userID, err := middleware.UserID(c)
+	if err != nil {
+		return err
+	}
+
 	req := new(CreateBillRequest)
 	if err := c.Bind().Body(req); err != nil {
 		return errorx.ErrParamsInvalid
 	}
 
-	if req.Amount == "" {
-		return errorx.New(fiber.StatusBadRequest, "Amount is required")
-	}
-
-	amountNumeric, err := decimal.NewFromString(req.Amount)
+	amount, occurredAt, err := parseBillPayload(req.Amount, req.OccurredAt)
 	if err != nil {
 		return err
 	}
 
-	var recordDate time.Time
-	if req.RecordDate == "" {
-		recordDate = time.Now()
-	} else {
-		recordDate, err = time.Parse("2006-01-02 15:04:05", req.RecordDate)
-		if err != nil {
-			recordDate, err = time.Parse("2006-01-02", req.RecordDate)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	bill, err := h.S.Bill.CreateBill(c, services.CreateBillInput{
-		Amount:      amountNumeric,
+	bill, err := h.S.Bill.CreateBill(c.Context(), userID, services.CreateBillInput{
+		Type:        req.Type,
+		Amount:      amount,
+		Currency:    req.Currency,
+		CategoryID:  req.CategoryID,
 		Description: req.Description,
-		BillType:    req.BillType,
-		Category:    req.Category,
-		RecordDate:  recordDate,
+		OccurredAt:  occurredAt,
 	})
 	if err != nil {
 		return err
@@ -95,50 +91,91 @@ func (h *Handler) CreateBill(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(toBillResponse(*bill))
 }
 
+func (h *Handler) GetBill(c fiber.Ctx) error {
+	userID, err := middleware.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return errorx.ErrParamsInvalid
+	}
+
+	bill, err := h.S.Bill.GetBill(c.Context(), userID, id)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(toBillResponse(*bill))
+}
+
 func (h *Handler) ListBills(c fiber.Ctx) error {
-	userIDStr := c.Locals("user_id").(string)
+	userID, err := middleware.UserID(c)
+	if err != nil {
+		return err
+	}
 
-	limitStr := c.Query("limit", "20")
-	limit, _ := strconv.Atoi(limitStr)
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	var billType *int16
+	if raw := strings.TrimSpace(c.Query("type")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 16)
+		if err != nil {
+			return errorx.ErrParamsInvalid
+		}
+		t := int16(parsed)
+		billType = &t
+	}
+	var categoryID *int64
+	if raw := strings.TrimSpace(c.Query("category_id")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return errorx.ErrParamsInvalid
+		}
+		categoryID = &parsed
+	}
+	var currency *string
+	if raw := strings.TrimSpace(c.Query("currency")); raw != "" {
+		currency = &raw
+	}
+	startTime, err := parseOptionalDateTime(c.Query("start_time"))
+	if err != nil {
+		return err
+	}
+	endTime, err := parseOptionalDateTime(c.Query("end_time"))
+	if err != nil {
+		return err
+	}
 
-	offsetStr := c.Query("offset", "0")
-	offset, _ := strconv.Atoi(offsetStr)
-
-	bills, err := h.S.Bill.ListBills(c, services.ListBillsInput{
-		UserID: userIDStr,
-		Limit:  limit,
-		Offset: offset,
+	bills, err := h.S.Bill.ListBills(c.Context(), userID, services.ListBillsInput{
+		Type:       billType,
+		CategoryID: categoryID,
+		Currency:   currency,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		Limit:      limit,
+		Offset:     offset,
 	})
 	if err != nil {
 		return err
 	}
 
-	response := make([]BillResponse, len(bills))
-	for i, b := range bills {
-		response[i] = toBillResponse(b)
+	response := make([]BillResponse, 0, len(bills))
+	for _, bill := range bills {
+		response = append(response, toBillResponse(bill))
 	}
 
 	return c.JSON(response)
 }
 
-func (h *Handler) DeleteBill(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return errorx.ErrParamsInvalid
-	}
-
-	err = h.S.Bill.DeleteBill(c, id)
+func (h *Handler) UpdateBill(c fiber.Ctx) error {
+	userID, err := middleware.UserID(c)
 	if err != nil {
 		return err
 	}
 
-	return c.SendStatus(fiber.StatusNoContent)
-}
-
-func (h *Handler) UpdateBill(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return errorx.ErrParamsInvalid
 	}
@@ -148,35 +185,84 @@ func (h *Handler) UpdateBill(c fiber.Ctx) error {
 		return errorx.ErrParamsInvalid
 	}
 
-	amountNumeric, err := decimal.NewFromString(req.Amount)
+	amount, occurredAt, err := parseBillPayload(req.Amount, req.OccurredAt)
 	if err != nil {
 		return err
 	}
 
-	var recordDate time.Time
-	if req.RecordDate == "" {
-		recordDate = time.Now()
-	} else {
-		recordDate, err = time.Parse("2006-01-02 15:04:05", req.RecordDate)
-		if err != nil {
-			recordDate, err = time.Parse("2006-01-02", req.RecordDate)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	bill, err := h.S.Bill.UpdateBill(c, services.UpdateBillInput{
+	bill, err := h.S.Bill.UpdateBill(c.Context(), userID, services.UpdateBillInput{
 		ID:          id,
-		Amount:      amountNumeric,
+		Type:        req.Type,
+		Amount:      amount,
+		Currency:    req.Currency,
+		CategoryID:  req.CategoryID,
 		Description: req.Description,
-		BillType:    req.BillType,
-		Category:    req.Category,
-		RecordDate:  recordDate,
+		OccurredAt:  occurredAt,
 	})
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(toBillResponse(bill))
+	return c.JSON(toBillResponse(*bill))
+}
+
+func (h *Handler) DeleteBill(c fiber.Ctx) error {
+	userID, err := middleware.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return errorx.ErrParamsInvalid
+	}
+
+	if err := h.S.Bill.DeleteBill(c.Context(), userID, id); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func parseBillPayload(amountRaw, occurredAtRaw string) (decimal.Decimal, time.Time, error) {
+	amount, err := decimal.NewFromString(strings.TrimSpace(amountRaw))
+	if err != nil {
+		return decimal.Zero, time.Time{}, errorx.New(400, "Amount must be a valid decimal")
+	}
+
+	occurredAt, err := parseRequiredDateTime(occurredAtRaw)
+	if err != nil {
+		return decimal.Zero, time.Time{}, err
+	}
+	return amount, occurredAt, nil
+}
+
+func parseRequiredDateTime(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, errorx.New(400, "OccurredAt is required")
+	}
+
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed, nil
+	}
+	if parsed, err := time.Parse("2006-01-02 15:04:05", raw); err == nil {
+		return parsed, nil
+	}
+	if parsed, err := time.Parse("2006-01-02", raw); err == nil {
+		return parsed, nil
+	}
+	return time.Time{}, errorx.New(400, "OccurredAt must be a valid datetime")
+}
+
+func parseOptionalDateTime(raw string) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := parseRequiredDateTime(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }

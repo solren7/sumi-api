@@ -8,26 +8,71 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
+
+type ApiKey struct {
+	ID         uuid.UUID          `json:"id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Name       string             `json:"name"`
+	KeyPrefix  string             `json:"key_prefix"`
+	KeyHash    string             `json:"key_hash"`
+	Scopes     []string           `json:"scopes"`
+	Status     string             `json:"status"`
+	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt  time.Time          `json:"created_at"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+}
 
 type Bill struct {
 	ID          int64           `json:"id"`
 	UserID      uuid.UUID       `json:"user_id"`
+	Type        int16           `json:"type"`
 	Amount      decimal.Decimal `json:"amount"`
+	Currency    string          `json:"currency"`
+	CategoryID  int64           `json:"category_id"`
 	Description string          `json:"description"`
-	BillType    int16           `json:"bill_type"`
-	Category    int32           `json:"category"`
-	RecordDate  time.Time       `json:"record_date"`
+	OccurredAt  time.Time       `json:"occurred_at"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
+type Category struct {
+	ID        int64       `json:"id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Type      int16       `json:"type"`
+	Name      string      `json:"name"`
+	ParentID  *int64      `json:"parent_id"`
+	Level     int16       `json:"level"`
+	SortOrder int32       `json:"sort_order"`
+	Icon      *string     `json:"icon"`
+	IsSystem  bool        `json:"is_system"`
+	IsActive  bool        `json:"is_active"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+type RefreshToken struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	DeviceID  *string            `json:"device_id"`
+	UserAgent *string            `json:"user_agent"`
+	IpAddress *string            `json:"ip_address"`
+	ExpiresAt time.Time          `json:"expires_at"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt time.Time          `json:"created_at"`
+}
+
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Password  string    `json:"password"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	Email           string    `json:"email"`
+	Username        string    `json:"username"`
+	PasswordHash    string    `json:"password_hash"`
+	DefaultCurrency string    `json:"default_currency"`
+	Timezone        string    `json:"timezone"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
