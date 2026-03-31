@@ -59,6 +59,26 @@ CREATE TRIGGER update_api_keys_modtime
 BEFORE UPDATE ON api_keys
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
+CREATE TABLE configs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type        VARCHAR(50) NOT NULL,
+    key         VARCHAR(100) NOT NULL,
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    value       JSONB NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT configs_status_chk CHECK (status IN ('active', 'inactive')),
+    CONSTRAINT configs_unique_key UNIQUE (type, key, user_id)
+);
+
+CREATE INDEX idx_configs_type_key ON configs(type, key);
+CREATE INDEX idx_configs_user_type ON configs(user_id, type);
+
+CREATE TRIGGER update_configs_modtime
+BEFORE UPDATE ON configs
+FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
+
 CREATE TABLE categories (
     id          BIGSERIAL PRIMARY KEY,
     user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -107,4 +127,60 @@ CREATE TRIGGER update_bills_modtime
 BEFORE UPDATE ON bills
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-SELECT setval('categories_id_seq', GREATEST((SELECT COALESCE(MAX(id), 1) FROM categories), 1), true);
+INSERT INTO configs (type, key, value, status)
+VALUES (
+    'category_template',
+    'default_categories',
+    '{
+      "expense": [
+        {
+          "name": "必要",
+          "sort_order": 1,
+          "children": [
+            { "name": "吃", "sort_order": 1 },
+            { "name": "穿", "sort_order": 2 },
+            { "name": "住", "sort_order": 3 },
+            { "name": "行", "sort_order": 4 }
+          ]
+        },
+        {
+          "name": "非必要",
+          "sort_order": 2,
+          "children": [
+            { "name": "旅行", "sort_order": 1 },
+            { "name": "娱乐", "sort_order": 2 },
+            { "name": "购物", "sort_order": 3 }
+          ]
+        },
+        {
+          "name": "其他",
+          "sort_order": 3,
+          "children": [
+            { "name": "其他", "sort_order": 1 }
+          ]
+        }
+      ],
+      "income": [
+        {
+          "name": "工资收入",
+          "sort_order": 1,
+          "children": [
+            { "name": "工资", "sort_order": 1 },
+            { "name": "奖金", "sort_order": 2 }
+          ]
+        },
+        {
+          "name": "其他收入",
+          "sort_order": 2,
+          "children": [
+            { "name": "理财", "sort_order": 1 },
+            { "name": "兼职", "sort_order": 2 },
+            { "name": "红包", "sort_order": 3 },
+            { "name": "其他", "sort_order": 4 }
+          ]
+        }
+      ]
+    }'::jsonb,
+    'active'
+)
+ON CONFLICT (type, key, user_id) DO NOTHING;

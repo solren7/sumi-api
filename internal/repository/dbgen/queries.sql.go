@@ -101,6 +101,56 @@ func (q *Queries) CreateBill(ctx context.Context, arg CreateBillParams) (Bill, e
 	return i, err
 }
 
+const createCategory = `-- name: CreateCategory :one
+INSERT INTO categories (
+    user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+) RETURNING id, user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active, created_at, updated_at
+`
+
+type CreateCategoryParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	Type      int16       `json:"type"`
+	Name      string      `json:"name"`
+	ParentID  *int64      `json:"parent_id"`
+	Level     int16       `json:"level"`
+	SortOrder int32       `json:"sort_order"`
+	Icon      *string     `json:"icon"`
+	IsSystem  bool        `json:"is_system"`
+	IsActive  bool        `json:"is_active"`
+}
+
+func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, createCategory,
+		arg.UserID,
+		arg.Type,
+		arg.Name,
+		arg.ParentID,
+		arg.Level,
+		arg.SortOrder,
+		arg.Icon,
+		arg.IsSystem,
+		arg.IsActive,
+	)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Name,
+		&i.ParentID,
+		&i.Level,
+		&i.SortOrder,
+		&i.Icon,
+		&i.IsSystem,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (
     user_id, token_hash, device_id, user_agent, ip_address, expires_at
@@ -289,14 +339,19 @@ func (q *Queries) GetBillByID(ctx context.Context, arg GetBillByIDParams) (Bill,
 	return i, err
 }
 
-const getCategoryByID = `-- name: GetCategoryByID :one
+const getCategoryByIDAndUser = `-- name: GetCategoryByIDAndUser :one
 SELECT id, user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active, created_at, updated_at FROM categories
-WHERE id = $1
+WHERE id = $1 AND user_id = $2
 LIMIT 1
 `
 
-func (q *Queries) GetCategoryByID(ctx context.Context, id int64) (Category, error) {
-	row := q.db.QueryRow(ctx, getCategoryByID, id)
+type GetCategoryByIDAndUserParams struct {
+	ID     int64       `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetCategoryByIDAndUser(ctx context.Context, arg GetCategoryByIDAndUserParams) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategoryByIDAndUser, arg.ID, arg.UserID)
 	var i Category
 	err := row.Scan(
 		&i.ID,
@@ -508,6 +563,36 @@ func (q *Queries) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (
 	return i, err
 }
 
+const getSystemConfigByTypeAndKey = `-- name: GetSystemConfigByTypeAndKey :one
+SELECT id, type, key, user_id, value, status, created_at, updated_at FROM configs
+WHERE type = $1
+  AND key = $2
+  AND user_id IS NULL
+  AND status = 'active'
+LIMIT 1
+`
+
+type GetSystemConfigByTypeAndKeyParams struct {
+	Type string `json:"type"`
+	Key  string `json:"key"`
+}
+
+func (q *Queries) GetSystemConfigByTypeAndKey(ctx context.Context, arg GetSystemConfigByTypeAndKeyParams) (Config, error) {
+	row := q.db.QueryRow(ctx, getSystemConfigByTypeAndKey, arg.Type, arg.Key)
+	var i Config
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Key,
+		&i.UserID,
+		&i.Value,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, username, password_hash, default_currency, timezone, created_at, updated_at FROM users
 WHERE email = $1
@@ -653,17 +738,21 @@ func (q *Queries) ListBills(ctx context.Context, arg ListBillsParams) ([]Bill, e
 	return items, nil
 }
 
-const listSystemCategoriesByType = `-- name: ListSystemCategoriesByType :many
+const listCategoriesByUserAndType = `-- name: ListCategoriesByUserAndType :many
 SELECT id, user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active, created_at, updated_at FROM categories
-WHERE user_id IS NULL
-  AND is_system = TRUE
+WHERE user_id = $1
   AND is_active = TRUE
-  AND type = $1
+  AND type = $2
 ORDER BY level ASC, parent_id ASC NULLS FIRST, sort_order ASC, id ASC
 `
 
-func (q *Queries) ListSystemCategoriesByType(ctx context.Context, type_ int16) ([]Category, error) {
-	rows, err := q.db.Query(ctx, listSystemCategoriesByType, type_)
+type ListCategoriesByUserAndTypeParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   int16       `json:"type"`
+}
+
+func (q *Queries) ListCategoriesByUserAndType(ctx context.Context, arg ListCategoriesByUserAndTypeParams) ([]Category, error) {
+	rows, err := q.db.Query(ctx, listCategoriesByUserAndType, arg.UserID, arg.Type)
 	if err != nil {
 		return nil, err
 	}

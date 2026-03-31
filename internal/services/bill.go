@@ -62,7 +62,7 @@ func (s *BillService) CreateBill(ctx context.Context, userID uuid.UUID, input Cr
 		return nil, err
 	}
 
-	if err := s.validateCategory(ctx, input.CategoryID, input.Type); err != nil {
+	if err := s.validateCategory(ctx, userID, input.CategoryID, input.Type); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +129,7 @@ func (s *BillService) UpdateBill(ctx context.Context, userID uuid.UUID, input Up
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validateCategory(ctx, input.CategoryID, input.Type); err != nil {
+	if err := s.validateCategory(ctx, userID, input.CategoryID, input.Type); err != nil {
 		return nil, err
 	}
 
@@ -169,8 +169,11 @@ func (s *BillService) DeleteBill(ctx context.Context, userID uuid.UUID, billID i
 	return nil
 }
 
-func (s *BillService) validateCategory(ctx context.Context, categoryID int64, billType int16) error {
-	category, err := s.q.GetCategoryByID(ctx, categoryID)
+func (s *BillService) validateCategory(ctx context.Context, userID uuid.UUID, categoryID int64, billType int16) error {
+	category, err := s.q.GetCategoryByIDAndUser(ctx, dbgen.GetCategoryByIDAndUserParams{
+		ID:     categoryID,
+		UserID: pgtype.UUID{Bytes: userID, Valid: true},
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return errorx.New(400, "Category not found")

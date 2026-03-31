@@ -3,6 +3,7 @@ package handlers
 import (
 	"strconv"
 
+	"fiber/middleware"
 	"fiber/pkg/errorx"
 
 	"github.com/gofiber/fiber/v3"
@@ -20,13 +21,18 @@ import (
 // @Failure 401 {object} ErrorResponse
 // @Router /api/categories [get]
 func (h *Handler) ListCategories(c fiber.Ctx) error {
+	userID, err := middleware.UserID(c)
+	if err != nil {
+		return err
+	}
+
 	rawType := c.Query("type", "1")
 	categoryType, err := strconv.ParseInt(rawType, 10, 16)
 	if err != nil {
 		return errorx.ErrParamsInvalid
 	}
 
-	items, err := h.S.Category.ListSystemCategories(c.Context(), int16(categoryType))
+	items, err := h.S.Category.ListCategoriesByUser(c.Context(), userID, int16(categoryType))
 	if err != nil {
 		return err
 	}

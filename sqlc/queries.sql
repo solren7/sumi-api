@@ -15,6 +15,14 @@ SELECT * FROM users
 WHERE id = $1
 LIMIT 1;
 
+-- name: GetSystemConfigByTypeAndKey :one
+SELECT * FROM configs
+WHERE type = $1
+  AND key = $2
+  AND user_id IS NULL
+  AND status = 'active'
+LIMIT 1;
+
 -- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (
     user_id, token_hash, device_id, user_agent, ip_address, expires_at
@@ -68,17 +76,23 @@ UPDATE api_keys
 SET status = 'revoked'
 WHERE id = $1 AND user_id = $2;
 
--- name: ListSystemCategoriesByType :many
+-- name: CreateCategory :one
+INSERT INTO categories (
+    user_id, type, name, parent_id, level, sort_order, icon, is_system, is_active
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+) RETURNING *;
+
+-- name: ListCategoriesByUserAndType :many
 SELECT * FROM categories
-WHERE user_id IS NULL
-  AND is_system = TRUE
+WHERE user_id = $1
   AND is_active = TRUE
-  AND type = $1
+  AND type = $2
 ORDER BY level ASC, parent_id ASC NULLS FIRST, sort_order ASC, id ASC;
 
--- name: GetCategoryByID :one
+-- name: GetCategoryByIDAndUser :one
 SELECT * FROM categories
-WHERE id = $1
+WHERE id = $1 AND user_id = $2
 LIMIT 1;
 
 -- name: CreateBill :one

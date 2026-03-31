@@ -54,6 +54,17 @@ type Category struct {
 	UpdatedAt time.Time   `json:"updated_at"`
 }
 
+type Config struct {
+	ID        uuid.UUID   `json:"id"`
+	Type      string      `json:"type"`
+	Key       string      `json:"key"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Value     []byte      `json:"value"`
+	Status    string      `json:"status"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
 type RefreshToken struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`

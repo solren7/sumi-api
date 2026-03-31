@@ -1,6 +1,7 @@
 -- +goose Up
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION update_modified_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -8,8 +9,9 @@ BEGIN
     RETURN NEW;
 END;
 $$ language 'plpgsql';
+-- +goose StatementEnd
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email             VARCHAR(255) NOT NULL UNIQUE,
     username          VARCHAR(50) NOT NULL,
@@ -20,11 +22,12 @@ CREATE TABLE users (
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS update_users_modtime ON users;
 CREATE TRIGGER update_users_modtime
 BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-CREATE TABLE refresh_tokens (
+CREATE TABLE IF NOT EXISTS refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash  VARCHAR(255) NOT NULL UNIQUE,
@@ -36,10 +39,10 @@ CREATE TABLE refresh_tokens (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
-CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 
-CREATE TABLE api_keys (
+CREATE TABLE IF NOT EXISTS api_keys (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name          VARCHAR(100) NOT NULL,
@@ -53,14 +56,36 @@ CREATE TABLE api_keys (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
-CREATE INDEX idx_api_keys_status ON api_keys(status);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_status ON api_keys(status);
 
+DROP TRIGGER IF EXISTS update_api_keys_modtime ON api_keys;
 CREATE TRIGGER update_api_keys_modtime
 BEFORE UPDATE ON api_keys
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS configs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type        VARCHAR(50) NOT NULL,
+    key         VARCHAR(100) NOT NULL,
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    value       JSONB NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT configs_status_chk CHECK (status IN ('active', 'inactive')),
+    CONSTRAINT configs_unique_key UNIQUE (type, key, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_configs_type_key ON configs(type, key);
+CREATE INDEX IF NOT EXISTS idx_configs_user_type ON configs(user_id, type);
+
+DROP TRIGGER IF EXISTS update_configs_modtime ON configs;
+CREATE TRIGGER update_configs_modtime
+BEFORE UPDATE ON configs
+FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
+
+CREATE TABLE IF NOT EXISTS categories (
     id          BIGSERIAL PRIMARY KEY,
     user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
     type        SMALLINT NOT NULL,
@@ -77,14 +102,15 @@ CREATE TABLE categories (
     CONSTRAINT categories_level_chk CHECK (level IN (1, 2))
 );
 
-CREATE INDEX idx_categories_type_parent_sort ON categories(type, parent_id, sort_order);
-CREATE INDEX idx_categories_user_type ON categories(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_categories_type_parent_sort ON categories(type, parent_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type);
 
+DROP TRIGGER IF EXISTS update_categories_modtime ON categories;
 CREATE TRIGGER update_categories_modtime
 BEFORE UPDATE ON categories
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-CREATE TABLE bills (
+CREATE TABLE IF NOT EXISTS bills (
     id          BIGSERIAL PRIMARY KEY,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type        SMALLINT NOT NULL,
@@ -99,43 +125,78 @@ CREATE TABLE bills (
     CONSTRAINT bills_amount_chk CHECK (amount > 0)
 );
 
-CREATE INDEX idx_bills_user_occurred_at ON bills(user_id, occurred_at DESC);
-CREATE INDEX idx_bills_user_type_occurred_at ON bills(user_id, type, occurred_at DESC);
-CREATE INDEX idx_bills_user_category_occurred_at ON bills(user_id, category_id, occurred_at DESC);
-CREATE INDEX idx_bills_user_currency_occurred_at ON bills(user_id, currency, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_user_occurred_at ON bills(user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_user_type_occurred_at ON bills(user_id, type, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_user_category_occurred_at ON bills(user_id, category_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_user_currency_occurred_at ON bills(user_id, currency, occurred_at DESC);
 
+DROP TRIGGER IF EXISTS update_bills_modtime ON bills;
 CREATE TRIGGER update_bills_modtime
 BEFORE UPDATE ON bills
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
-INSERT INTO categories (id, type, name, parent_id, level, sort_order, is_system, is_active)
-VALUES
-    (1001, 1, '必要', NULL, 1, 1, TRUE, TRUE),
-    (1002, 1, '非必要', NULL, 1, 2, TRUE, TRUE),
-    (1003, 1, '其他', NULL, 1, 3, TRUE, TRUE),
-    (1101, 1, '吃', 1001, 2, 1, TRUE, TRUE),
-    (1102, 1, '穿', 1001, 2, 2, TRUE, TRUE),
-    (1103, 1, '住', 1001, 2, 3, TRUE, TRUE),
-    (1104, 1, '行', 1001, 2, 4, TRUE, TRUE),
-    (1201, 1, '旅行', 1002, 2, 1, TRUE, TRUE),
-    (1202, 1, '娱乐', 1002, 2, 2, TRUE, TRUE),
-    (1203, 1, '购物', 1002, 2, 3, TRUE, TRUE),
-    (1301, 1, '其他', 1003, 2, 1, TRUE, TRUE),
-    (2001, 2, '工资收入', NULL, 1, 1, TRUE, TRUE),
-    (2002, 2, '其他收入', NULL, 1, 2, TRUE, TRUE),
-    (2101, 2, '工资', 2001, 2, 1, TRUE, TRUE),
-    (2102, 2, '奖金', 2001, 2, 2, TRUE, TRUE),
-    (2201, 2, '理财', 2002, 2, 1, TRUE, TRUE),
-    (2202, 2, '兼职', 2002, 2, 2, TRUE, TRUE),
-    (2203, 2, '红包', 2002, 2, 3, TRUE, TRUE),
-    (2204, 2, '其他', 2002, 2, 4, TRUE, TRUE)
-ON CONFLICT (id) DO NOTHING;
-
-SELECT setval('categories_id_seq', GREATEST((SELECT COALESCE(MAX(id), 1) FROM categories), 1), true);
+INSERT INTO configs (type, key, value, status)
+VALUES (
+    'category_template',
+    'default_categories',
+    '{
+      "expense": [
+        {
+          "name": "必要",
+          "sort_order": 1,
+          "children": [
+            { "name": "吃", "sort_order": 1 },
+            { "name": "穿", "sort_order": 2 },
+            { "name": "住", "sort_order": 3 },
+            { "name": "行", "sort_order": 4 }
+          ]
+        },
+        {
+          "name": "非必要",
+          "sort_order": 2,
+          "children": [
+            { "name": "旅行", "sort_order": 1 },
+            { "name": "娱乐", "sort_order": 2 },
+            { "name": "购物", "sort_order": 3 }
+          ]
+        },
+        {
+          "name": "其他",
+          "sort_order": 3,
+          "children": [
+            { "name": "其他", "sort_order": 1 }
+          ]
+        }
+      ],
+      "income": [
+        {
+          "name": "工资收入",
+          "sort_order": 1,
+          "children": [
+            { "name": "工资", "sort_order": 1 },
+            { "name": "奖金", "sort_order": 2 }
+          ]
+        },
+        {
+          "name": "其他收入",
+          "sort_order": 2,
+          "children": [
+            { "name": "理财", "sort_order": 1 },
+            { "name": "兼职", "sort_order": 2 },
+            { "name": "红包", "sort_order": 3 },
+            { "name": "其他", "sort_order": 4 }
+          ]
+        }
+      ]
+    }'::jsonb,
+    'active'
+)
+ON CONFLICT (type, key, user_id) DO NOTHING;
 
 -- +goose Down
 DROP TABLE IF EXISTS bills;
 DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS configs;
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS users;

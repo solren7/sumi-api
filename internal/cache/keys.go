@@ -19,6 +19,10 @@ func SystemCategoriesKey(categoryType int16) string {
 	return fmt.Sprintf("categories:system:type:%d", categoryType)
 }
 
+func UserCategoriesKey(userID uuid.UUID, categoryType int16) string {
+	return fmt.Sprintf("categories:user:%s:type:%d", userID.String(), categoryType)
+}
+
 func MonthlyStatsKey(userID uuid.UUID, month string) string {
 	return fmt.Sprintf("stats:monthly:%s:%s", userID.String(), month)
 }

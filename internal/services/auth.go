@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,13 +34,14 @@ type refreshTokenCacheValue struct {
 }
 
 type AuthService struct {
+	pool *pgxpool.Pool
 	q   *dbgen.Queries
 	cfg *config.Config
 	rdb redis.UniversalClient
 }
 
-func NewAuthService(q *dbgen.Queries, cfg *config.Config, rdb redis.UniversalClient) *AuthService {
-	return &AuthService{q: q, cfg: cfg, rdb: rdb}
+func NewAuthService(pool *pgxpool.Pool, q *dbgen.Queries, cfg *config.Config, rdb redis.UniversalClient) *AuthService {
+	return &AuthService{pool: pool, q: q, cfg: cfg, rdb: rdb}
 }
 
 type RegisterInput struct {
@@ -50,6 +54,22 @@ type AuthOutput struct {
 	AccessToken  string
 	RefreshToken string
 	User         *dbgen.User
+}
+
+type categoryTemplate struct {
+	Expense []categoryTemplateGroup `json:"expense"`
+	Income  []categoryTemplateGroup `json:"income"`
+}
+
+type categoryTemplateGroup struct {
+	Name      string                  `json:"name"`
+	SortOrder int32                   `json:"sort_order"`
+	Children  []categoryTemplateChild `json:"children"`
+}
+
+type categoryTemplateChild struct {
+	Name      string `json:"name"`
+	SortOrder int32  `json:"sort_order"`
 }
 
 func normalizeEmail(email string) string {
@@ -95,7 +115,14 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput, meta Se
 		return nil, err
 	}
 
-	user, err := s.q.CreateUser(ctx, dbgen.CreateUserParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.q.WithTx(tx)
+	user, err := txQueries.CreateUser(ctx, dbgen.CreateUserParams{
 		Email:           email,
 		Username:        username,
 		PasswordHash:    string(hashedPassword),
@@ -103,6 +130,14 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput, meta Se
 		Timezone:        s.cfg.DefaultTimezone,
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.initializeUserCategories(ctx, txQueries, user.ID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -274,4 +309,66 @@ func (s *AuthService) getRefreshTokenRecord(ctx context.Context, tokenHash strin
 	})
 
 	return record, nil
+}
+
+func (s *AuthService) initializeUserCategories(ctx context.Context, q *dbgen.Queries, userID uuid.UUID) error {
+	cfg, err := q.GetSystemConfigByTypeAndKey(ctx, dbgen.GetSystemConfigByTypeAndKeyParams{
+		Type: "category_template",
+		Key:  "default_categories",
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return errorx.New(500, "Default category template is missing")
+		}
+		return err
+	}
+
+	var tpl categoryTemplate
+	if err := json.Unmarshal(cfg.Value, &tpl); err != nil {
+		return fmt.Errorf("parse category template config: %w", err)
+	}
+
+	userUUID := pgtype.UUID{Bytes: userID, Valid: true}
+	if err := insertCategoryTemplateGroups(ctx, q, userUUID, 1, tpl.Expense); err != nil {
+		return err
+	}
+	if err := insertCategoryTemplateGroups(ctx, q, userUUID, 2, tpl.Income); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func insertCategoryTemplateGroups(ctx context.Context, q *dbgen.Queries, userID pgtype.UUID, categoryType int16, groups []categoryTemplateGroup) error {
+	for _, group := range groups {
+		parent, err := q.CreateCategory(ctx, dbgen.CreateCategoryParams{
+			UserID:    userID,
+			Type:      categoryType,
+			Name:      strings.TrimSpace(group.Name),
+			Level:     1,
+			SortOrder: group.SortOrder,
+			IsSystem:  false,
+			IsActive:  true,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, child := range group.Children {
+			if _, err := q.CreateCategory(ctx, dbgen.CreateCategoryParams{
+				UserID:    userID,
+				Type:      categoryType,
+				Name:      strings.TrimSpace(child.Name),
+				ParentID:  &parent.ID,
+				Level:     2,
+				SortOrder: child.SortOrder,
+				IsSystem:  false,
+				IsActive:  true,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

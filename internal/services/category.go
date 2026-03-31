@@ -8,6 +8,8 @@ import (
 	"fiber/internal/cache"
 	"fiber/internal/repository/dbgen"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -30,14 +32,17 @@ func NewCategoryService(q *dbgen.Queries, cfg *config.Config, rdb redis.Universa
 	return &CategoryService{q: q, cfg: cfg, rdb: rdb}
 }
 
-func (s *CategoryService) ListSystemCategories(ctx context.Context, categoryType int16) ([]CategoryNode, error) {
-	cacheKey := cache.SystemCategoriesKey(categoryType)
+func (s *CategoryService) ListCategoriesByUser(ctx context.Context, userID uuid.UUID, categoryType int16) ([]CategoryNode, error) {
+	cacheKey := cache.UserCategoriesKey(userID, categoryType)
 	var cached []CategoryNode
 	if raw, err := s.rdb.Get(ctx, cacheKey).Result(); err == nil && json.Unmarshal([]byte(raw), &cached) == nil {
 		return cached, nil
 	}
 
-	rows, err := s.q.ListSystemCategoriesByType(ctx, categoryType)
+	rows, err := s.q.ListCategoriesByUserAndType(ctx, dbgen.ListCategoriesByUserAndTypeParams{
+		UserID: pgtype.UUID{Bytes: userID, Valid: true},
+		Type:   categoryType,
+	})
 	if err != nil {
 		return nil, err
 	}

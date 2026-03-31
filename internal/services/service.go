@@ -4,6 +4,7 @@ import (
 	"fiber/config"
 	"fiber/internal/repository/dbgen"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -15,11 +16,11 @@ type Service struct {
 	Stats    *StatsService
 }
 
-func NewService(q *dbgen.Queries, cfg *config.Config, rdb redis.UniversalClient) *Service {
+func NewService(pool *pgxpool.Pool, q *dbgen.Queries, cfg *config.Config, rdb redis.UniversalClient) *Service {
 	statsSvc := NewStatsService(q, cfg, rdb)
 
 	return &Service{
-		Auth:     NewAuthService(q, cfg, rdb),
+		Auth:     NewAuthService(pool, q, cfg, rdb),
 		APIKey:   NewAPIKeyService(q, cfg, rdb),
 		Category: NewCategoryService(q, cfg, rdb),
 		Bill:     NewBillService(q, cfg, rdb, statsSvc),
