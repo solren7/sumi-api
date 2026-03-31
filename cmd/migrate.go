@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"time"
 
 	"fiber/config"
 	"fiber/internal/database"
@@ -18,7 +17,7 @@ var migrateCmd = &cobra.Command{
 		cfg := config.NewConfig()
 		logx.Configure(cfg.LogFormat)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.MigrationTimeout)
 		defer cancel()
 
 		if len(args) > 0 && args[0] == "status" {

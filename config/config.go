@@ -25,6 +25,7 @@ type Config struct {
 	RefreshTokenCacheExtra time.Duration `env:"REFRESH_TOKEN_CACHE_EXTRA_TTL" envDefault:"0s"`
 	AutoMigrate            bool          `env:"AUTO_MIGRATE" envDefault:"false"`
 	MigrationsDir          string        `env:"MIGRATIONS_DIR" envDefault:"./migrations"`
+	MigrationTimeout       time.Duration `env:"MIGRATION_TIMEOUT" envDefault:"5m"`
 }
 
 type RedisConfig struct {

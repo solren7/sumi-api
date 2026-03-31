@@ -48,7 +48,7 @@ func StartAPIServer(cfg *config.Config) {
 
 	if cfg.AutoMigrate {
 		logx.Info("Running database migrations...")
-		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), cfg.MigrationTimeout)
 		if err := database.RunMigrations(migrateCtx, cfg); err != nil {
 			migrateCancel()
 			logx.WithError(err).Fatal("Failed to run database migrations")
