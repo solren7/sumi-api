@@ -16,7 +16,11 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /out/server /app/server
+COPY --from=builder /src/migrations /app/migrations
+COPY --from=builder /src/scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 3000
 
-ENTRYPOINT ["/app/server", "api"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

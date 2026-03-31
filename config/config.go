@@ -11,7 +11,7 @@ type Config struct {
 	DBDSN                  string        `env:"DB_DSN"`
 	RedisConfig            RedisConfig
 	ServerPort             string        `env:"SERVER_PORT" envDefault:":3000"`
-	LogFormat              string        `env:"LOG_FORMAT" envDefault:"console"`
+	LogFormat              string        `env:"LOG_FORMAT" envDefault:"json"`
 	JWTSecret              string        `env:"JWT_SECRET" envDefault:"secret"`
 	AccessTokenTTL         time.Duration `env:"ACCESS_TOKEN_TTL" envDefault:"15m"`
 	RefreshTokenTTL        time.Duration `env:"REFRESH_TOKEN_TTL" envDefault:"720h"`
@@ -23,6 +23,8 @@ type Config struct {
 	CategoryCacheTTL       time.Duration `env:"CATEGORY_CACHE_TTL" envDefault:"12h"`
 	APIKeyCacheTTL         time.Duration `env:"API_KEY_CACHE_TTL" envDefault:"15m"`
 	RefreshTokenCacheExtra time.Duration `env:"REFRESH_TOKEN_CACHE_EXTRA_TTL" envDefault:"0s"`
+	AutoMigrate            bool          `env:"AUTO_MIGRATE" envDefault:"false"`
+	MigrationsDir          string        `env:"MIGRATIONS_DIR" envDefault:"./migrations"`
 }
 
 type RedisConfig struct {

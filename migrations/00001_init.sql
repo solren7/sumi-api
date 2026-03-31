@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE OR REPLACE FUNCTION update_modified_column()
@@ -107,4 +108,35 @@ CREATE TRIGGER update_bills_modtime
 BEFORE UPDATE ON bills
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
 
+INSERT INTO categories (id, type, name, parent_id, level, sort_order, is_system, is_active)
+VALUES
+    (1001, 1, '必要', NULL, 1, 1, TRUE, TRUE),
+    (1002, 1, '非必要', NULL, 1, 2, TRUE, TRUE),
+    (1003, 1, '其他', NULL, 1, 3, TRUE, TRUE),
+    (1101, 1, '吃', 1001, 2, 1, TRUE, TRUE),
+    (1102, 1, '穿', 1001, 2, 2, TRUE, TRUE),
+    (1103, 1, '住', 1001, 2, 3, TRUE, TRUE),
+    (1104, 1, '行', 1001, 2, 4, TRUE, TRUE),
+    (1201, 1, '旅行', 1002, 2, 1, TRUE, TRUE),
+    (1202, 1, '娱乐', 1002, 2, 2, TRUE, TRUE),
+    (1203, 1, '购物', 1002, 2, 3, TRUE, TRUE),
+    (1301, 1, '其他', 1003, 2, 1, TRUE, TRUE),
+    (2001, 2, '工资收入', NULL, 1, 1, TRUE, TRUE),
+    (2002, 2, '其他收入', NULL, 1, 2, TRUE, TRUE),
+    (2101, 2, '工资', 2001, 2, 1, TRUE, TRUE),
+    (2102, 2, '奖金', 2001, 2, 2, TRUE, TRUE),
+    (2201, 2, '理财', 2002, 2, 1, TRUE, TRUE),
+    (2202, 2, '兼职', 2002, 2, 2, TRUE, TRUE),
+    (2203, 2, '红包', 2002, 2, 3, TRUE, TRUE),
+    (2204, 2, '其他', 2002, 2, 4, TRUE, TRUE)
+ON CONFLICT (id) DO NOTHING;
+
 SELECT setval('categories_id_seq', GREATEST((SELECT COALESCE(MAX(id), 1) FROM categories), 1), true);
+
+-- +goose Down
+DROP TABLE IF EXISTS bills;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;
+DROP FUNCTION IF EXISTS update_modified_column();

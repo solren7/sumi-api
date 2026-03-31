@@ -46,6 +46,17 @@ func StartAPIServer(cfg *config.Config) {
 		logx.WithError(err).Fatal("Failed to connect to Database")
 	}
 
+	if cfg.AutoMigrate {
+		logx.Info("Running database migrations...")
+		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := database.RunMigrations(migrateCtx, cfg); err != nil {
+			migrateCancel()
+			logx.WithError(err).Fatal("Failed to run database migrations")
+		}
+		migrateCancel()
+		logx.Info("Database migrations completed.")
+	}
+
 	// 2. Initialize Redis
 	logx.Info("Connecting to redis...")
 	rdb, err := database.NewRedis(context.Background(), cfg)
