@@ -16,6 +16,12 @@ func ErrorHandler(ctx fiber.Ctx, err error) error {
 	if errors.As(err, &e) {
 		code = e.Code
 		message = e.Message
+	} else {
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			code = fiberErr.Code
+			message = fiberErr.Message
+		}
 	}
 	return ctx.Status(code).JSON(fiber.Map{
 		"success": false,
