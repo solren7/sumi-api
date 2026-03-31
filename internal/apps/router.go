@@ -52,6 +52,7 @@ func RegisterRoutes(app *fiber.App, handler *handlers.Handler, _ any) {
 
 	// Routes
 	api := app.Group("/api")
+	api.Get("/ping", handler.Ping)
 
 	// Auth Routes
 	auth := api.Group("/auth")

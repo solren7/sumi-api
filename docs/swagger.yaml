@@ -130,6 +130,11 @@ definitions:
       success:
         type: boolean
     type: object
+  handlers.PingResponse:
+    properties:
+      message:
+        type: string
+    type: object
   handlers.RefreshTokenRequest:
     properties:
       refresh_token:
@@ -728,6 +733,18 @@ paths:
       summary: List system categories
       tags:
       - Categories
+  /api/ping:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PingResponse'
+      summary: Ping endpoint
+      tags:
+      - Health
   /api/stats/category:
     get:
       parameters:

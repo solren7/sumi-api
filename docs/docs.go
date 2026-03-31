@@ -760,6 +760,25 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/ping": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Ping endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PingResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/stats/category": {
             "get": {
                 "security": [
@@ -1424,6 +1443,14 @@ const docTemplate = `{
                 },
                 "success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "handlers.PingResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
                 }
             }
         },
