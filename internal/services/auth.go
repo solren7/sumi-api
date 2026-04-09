@@ -95,6 +95,12 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput, meta Se
 	if len(input.Password) < 8 {
 		return nil, errorx.New(400, "Password must be at least 8 characters")
 	}
+	if len(input.Password) > 128 {
+		return nil, errorx.New(400, "Password must be at most 128 characters")
+	}
+	if len(input.Username) > 64 {
+		return nil, errorx.New(400, "Username must be at most 64 characters")
+	}
 
 	exists, err := s.CheckEmailExists(ctx, email)
 	if err != nil {

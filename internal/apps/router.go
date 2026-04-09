@@ -1,17 +1,25 @@
 package apps
 
 import (
+	"strings"
+	"time"
+
 	docs "fiber/docs"
+	"fiber/config"
 	"fiber/internal/handlers"
 	"fiber/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
 )
 
-func RegisterRoutes(app *fiber.App, handler *handlers.Handler, _ any) {
+func RegisterRoutes(app *fiber.App, handler *handlers.Handler, cfg *config.Config) {
 	// Middlewares
-	app.Use(cors.New())
+	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: allowedOrigins,
+	}))
 	app.Use(middleware.LogxMeta)
 	app.Use(middleware.RequestLog())
 	app.Get("/openapi.yaml", func(c fiber.Ctx) error {
@@ -54,12 +62,24 @@ func RegisterRoutes(app *fiber.App, handler *handlers.Handler, _ any) {
 	api := app.Group("/api")
 	api.Get("/ping", handler.Ping)
 
+	// Rate limiter for auth endpoints: 10 requests per minute per IP.
+	authLimiter := limiter.New(limiter.Config{
+		Max:        10,
+		Expiration: 1 * time.Minute,
+		KeyGenerator: func(c fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c fiber.Ctx) error {
+			return fiber.NewError(fiber.StatusTooManyRequests, "Too many requests, please try again later")
+		},
+	})
+
 	// Auth Routes
 	auth := api.Group("/auth")
-	auth.Post("/check-email", handler.CheckEmail)
-	auth.Post("/register", handler.Register)
-	auth.Post("/login", handler.Login)
-	auth.Post("/refresh", handler.Refresh)
+	auth.Post("/check-email", authLimiter, handler.CheckEmail)
+	auth.Post("/register", authLimiter, handler.Register)
+	auth.Post("/login", authLimiter, handler.Login)
+	auth.Post("/refresh", authLimiter, handler.Refresh)
 	auth.Post("/logout", handler.Logout)
 	auth.Get("/me", middleware.JWTOnly(handler.S.Auth), handler.Me)
 

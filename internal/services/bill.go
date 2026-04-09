@@ -66,13 +66,18 @@ func (s *BillService) CreateBill(ctx context.Context, userID uuid.UUID, input Cr
 		return nil, err
 	}
 
+	description := strings.TrimSpace(input.Description)
+	if len(description) > 500 {
+		return nil, errorx.New(400, "Description must be at most 500 characters")
+	}
+
 	bill, err := s.q.CreateBill(ctx, dbgen.CreateBillParams{
 		UserID:      userID,
 		Type:        input.Type,
 		Amount:      input.Amount,
 		Currency:    currency,
 		CategoryID:  input.CategoryID,
-		Description: strings.TrimSpace(input.Description),
+		Description: description,
 		OccurredAt:  input.OccurredAt,
 	})
 	if err != nil {
@@ -133,13 +138,18 @@ func (s *BillService) UpdateBill(ctx context.Context, userID uuid.UUID, input Up
 		return nil, err
 	}
 
+	description := strings.TrimSpace(input.Description)
+	if len(description) > 500 {
+		return nil, errorx.New(400, "Description must be at most 500 characters")
+	}
+
 	bill, err := s.q.UpdateBill(ctx, dbgen.UpdateBillParams{
 		ID:          input.ID,
 		Type:        input.Type,
 		Amount:      input.Amount,
 		Currency:    currency,
 		CategoryID:  input.CategoryID,
-		Description: strings.TrimSpace(input.Description),
+		Description: description,
 		OccurredAt:  input.OccurredAt,
 		UserID:      userID,
 	})

@@ -1,11 +1,19 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
+
+// Insecure placeholder values that must be overridden in production.
+var insecureDefaults = map[string]string{
+	"JWT_SECRET":            "secret",
+	"REFRESH_TOKEN_PEPPER":  "refresh-pepper",
+	"API_KEY_PEPPER":        "api-key-pepper",
+}
 
 type Config struct {
 	DBDSN                  string        `env:"DB_DSN"`
@@ -26,6 +34,8 @@ type Config struct {
 	AutoMigrate            bool          `env:"AUTO_MIGRATE" envDefault:"false"`
 	MigrationsDir          string        `env:"MIGRATIONS_DIR" envDefault:"./migrations"`
 	MigrationTimeout       time.Duration `env:"MIGRATION_TIMEOUT" envDefault:"5m"`
+	AllowedOrigins         string        `env:"ALLOWED_ORIGINS" envDefault:"*"`
+	Production             bool          `env:"PRODUCTION" envDefault:"false"`
 }
 
 type RedisConfig struct {
@@ -50,5 +60,21 @@ func NewConfig() *Config {
 	if err := env.Parse(&cfg); err != nil {
 		panic(err)
 	}
+
+	if cfg.Production {
+		if cfg.JWTSecret == insecureDefaults["JWT_SECRET"] {
+			panic(fmt.Sprintf("FATAL: JWT_SECRET is set to the insecure default value %q — set a strong secret via the JWT_SECRET env var", cfg.JWTSecret))
+		}
+		if cfg.RefreshTokenPepper == insecureDefaults["REFRESH_TOKEN_PEPPER"] {
+			panic(fmt.Sprintf("FATAL: REFRESH_TOKEN_PEPPER is set to the insecure default value %q — set a strong value via the REFRESH_TOKEN_PEPPER env var", cfg.RefreshTokenPepper))
+		}
+		if cfg.APIKeyPepper == insecureDefaults["API_KEY_PEPPER"] {
+			panic(fmt.Sprintf("FATAL: API_KEY_PEPPER is set to the insecure default value %q — set a strong value via the API_KEY_PEPPER env var", cfg.APIKeyPepper))
+		}
+		if len(cfg.JWTSecret) < 32 {
+			panic("FATAL: JWT_SECRET must be at least 32 characters in production")
+		}
+	}
+
 	return &cfg
 }
